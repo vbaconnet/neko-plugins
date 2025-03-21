@@ -36,14 +36,16 @@
 module sponge
   use num_types, only : rp, dp, sp
   use json_module, only : json_file
+  use utils, only: extract_fld_file_index, filename_chsuffix
   use field_registry, only : neko_field_registry
   use field, only : field_t
+  use global_interpolation, only: global_interpolation_t
   use json_utils, only : json_get, json_get_or_default
   use point_zone, only: point_zone_t
   use point_zone_registry, only: neko_point_zone_registry
   use fluid_user_source_term, only: fluid_user_source_term_t
-  use math, only: sub3, col2
-  use device_math, only: device_sub3, device_col2
+  use math, only: sub3, col2, copy
+  use device_math, only: device_sub3, device_col2, device_copy
   use utils, only: neko_error
   use logger, only: neko_log, LOG_SIZE, NEKO_LOG_DEBUG, NEKO_LOG_INFO, NEKO_LOG_VERBOSE
   use field_math, only: field_copy
@@ -53,7 +55,8 @@ module sponge
   use, intrinsic :: iso_c_binding, only: c_ptr, c_null_ptr, c_associated
   use box_point_zone, only: box_point_zone_t
   use dofmap, only: dofmap_t
-
+  use file, only: file_t
+  use fld_file_data, only: fld_file_data_t
   implicit none
   private
 
@@ -97,8 +100,10 @@ module sponge
           sponge_init_from_attributes
      !> Destructor.
      procedure, pass(this) :: free => sponge_free
-     !> Assign the base flow field
-     procedure, pass(this) :: assign_baseflow => sponge_assign_baseflow
+     !> Assign the base flow field directly from fields
+     procedure, pass(this) :: assign_baseflow_field => sponge_assign_baseflow_field
+     !> Assign the base flow field from a fld file
+     procedure, pass(this) :: assign_baseflow_file => sponge_assign_baseflow_file
      !> Compute the fringe field.
      procedure, pass(this) :: compute_fringe => sponge_compute_fringe
      !> Compute the sponge field.
@@ -145,7 +150,80 @@ contains
   end subroutine sponge_init_from_attributes
 
   !> Copy the baseflow from a set of fields
-  subroutine sponge_assign_baseflow(this, u,v,w)
+  !! param @fname e.g. "field0.f00010"
+  subroutine sponge_assign_baseflow_file(this, raw_fname, interpolate)
+    class(sponge_t), intent(inout) :: this
+    character(len=*), intent(in) :: raw_fname
+    logical, intent(in) :: interpolate
+
+    character(len=1024) :: fname
+    type(global_interpolation_t) :: global_interp
+    type(file_t) :: f
+    type(fld_file_data_t) :: fld
+    integer :: sample_idx
+
+    call neko_log%message("(SPONGE) Assigning baseflow from file", lvl = NEKO_LOG_INFO)
+    ! Extract idx from ".f00010"
+    call neko_log%message("(SPONGE) reading file " // trim(raw_fname), lvl = NEKO_LOG_INFO)
+    sample_idx = extract_fld_file_index(trim(raw_fname), -1)
+    if (sample_idx .eq. -1) &
+         call neko_error("(SPONGE) Invalid file name. The&
+      & file format must be e.g. 'mean0.f00001'")
+
+    call filename_chsuffix(raw_fname, fname, 'fld')
+
+    ! Read field file
+    f = file_t(trim(fname))
+    call fld%init
+    call f%set_counter(sample_idx)
+    call f%read(fld)
+
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call neko_log%message("(SPONGE) fld data copying to device" , lvl = NEKO_LOG_INFO)
+       call device_memcpy(fld%u%x, fld%u%x_d, fld%u%n, HOST_TO_DEVICE, .false.)
+       call device_memcpy(fld%v%x, fld%v%x_d, fld%v%n, HOST_TO_DEVICE, .false.)
+       call device_memcpy(fld%w%x, fld%w%x_d, fld%w%n, HOST_TO_DEVICE, .false.)
+    end if
+
+    if (interpolate) then
+
+       ! Generates an interpolator object and performs the point search
+       call neko_log%message("(SPONGE) Generating global interpolator " // trim(fname), lvl = NEKO_LOG_INFO)
+       global_interp = fld%generate_interpolator(this%u%dof, this%u%msh, &
+            1d-6)
+
+       ! Evaluate velocities and pressure
+       call neko_log%message("(SPONGE) Interpolating " // trim(fname), lvl = NEKO_LOG_INFO)
+       call global_interp%evaluate(this%u_bf%x, fld%u%x, .false. )
+       call global_interp%evaluate(this%v_bf%x, fld%v%x, .false. )
+       call global_interp%evaluate(this%w_bf%x, fld%w%x, .false. )
+
+       call global_interp%free
+
+    else
+
+       if (NEKO_BCKND_DEVICE .eq. 1) then
+          call neko_log%message("(SPONGE) Copying fld data on gpu" // trim(fname), lvl = NEKO_LOG_INFO)
+          call device_copy(this%u_bf%x_d, fld%u%x_d, fld%u%n)
+          call device_copy(this%v_bf%x_d, fld%v%x_d, fld%v%n)
+          call device_copy(this%w_bf%x_d, fld%w%x_d, fld%w%n)
+       else
+          call neko_log%message("(SPONGE) Copying fld data on cpu" // trim(fname), lvl = NEKO_LOG_INFO)
+          call copy(this%u_bf%x, fld%u%x, fld%u%n)
+          call copy(this%v_bf%x, fld%v%x, fld%v%n)
+          call copy(this%w_bf%x, fld%w%x, fld%w%n)
+       end if
+
+    end if
+    
+    call neko_log%message("(SPONGE) done assigning baseflow file", lvl = NEKO_LOG_INFO)
+
+    this%baseflow_set = .true.
+
+  end subroutine sponge_assign_baseflow_file
+
+  !> Copy the baseflow from a set of fields
+  subroutine sponge_assign_baseflow_field(this, u,v,w)
     class(sponge_t), intent(inout) :: this
     type(field_t), intent(in) :: u,v,w
 
@@ -157,7 +235,7 @@ contains
 
     this%baseflow_set = .true.
 
-  end subroutine sponge_assign_baseflow
+  end subroutine sponge_assign_baseflow_field
 
   !> Build the fringe based on the type of point zone
   ! Linear ramp for the sponge region. xramp is controlled
