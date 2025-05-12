@@ -271,7 +271,6 @@ contains
        type is (box_point_zone_t)
 
           n = b%size
-          dx = b%xmax - b%xmin
           xramp = b%xmin + this%alpha_in * (b%xmax - b%xmin)
 
           call neko_log%message("(SPONGE) doing ramp calculation", lvl = NEKO_LOG_INFO)
@@ -279,7 +278,7 @@ contains
              imask = b%mask(i)
              x = this%u%dof%x(imask, 1, 1, 1)
              if (x .gt. b%xmin .and. x .lt. xramp) then
-                this%fringe%x(imask,1,1,1) = this%amplitude * (x - b%xmin) / dx
+                this%fringe%x(imask,1,1,1) = this%amplitude * (x - b%xmin) / (b%xmax - b%xmin)
             else if (x .lt. b%xmax .and. x .ge. xramp) then
                this%fringe%x(imask,1,1,1) = this%amplitude
              end if
@@ -294,7 +293,7 @@ contains
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call neko_log%message("(SPONGE) fringe, copying to device" , lvl = NEKO_LOG_INFO)
        call device_memcpy(this%fringe%x, this%fringe%x_d, &
-            this%fringe%size(), HOST_TO_DEVICE, .false.)
+            this%fringe%size(), HOST_TO_DEVICE, .true.)
     end if
 
     this%fringe_set = .true.

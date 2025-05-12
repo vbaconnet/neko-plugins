@@ -1,0 +1,16 @@
+#!/bin/sh -e
+
+prefix=/scratch/baconnet/software/neko
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir_pkg=${prefix}/include/neko
+FC=mpif90
+FCFLAGS='-I/scratch/baconnet/software/anaconda3/pkgs/json-fortran-8.3.0-h2a4ca65_0/include  -g -O2'
+
+printf "\n%s\n" 'N E K O build tool, Version 0.8.99'
+printf "%s\n" '(build: 2024-07-11 on x86_64-pc-linux-gnu using gnu)'
+
+$FC $FCFLAGS -I$includedir_pkg -L$libdir extract_boundaries.f90\
+    -lneko -L/scratch/baconnet/externals/gslib/build/lib -L/scratch/baconnet/externals/gslib/build  -L/scratch/baconnet/software/anaconda3/pkgs/json-fortran-8.3.0-h2a4ca65_0/lib/ -ljsonfortran  -lgs  -llapack -lblas    -o ../extract_boundaries
+
+printf "%s\n" ' done!'
