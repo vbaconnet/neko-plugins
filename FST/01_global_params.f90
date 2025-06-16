@@ -4,14 +4,14 @@ module global_params
 
   implicit none
 
-  real(kind=rp) :: glb_uinf = 2.0_rp
-  real(kind=rp) :: fst_ti = 3.4d-2 ! turbulence intensity
-  real(kind=rp) :: fst_il = 29.22d-3 ! integral length scale		
+  real(kind=rp) :: glb_uinf = 6.0_rp
+  real(kind=rp) :: fst_ti = 3.7d-2 ! turbulence intensity
+  real(kind=rp) :: fst_il = 11.53d-3 ! integral length scale		
 
-  integer, parameter :: nshells = 40! No of spherical shells
+  integer, parameter :: nshells = 80! No of spherical shells
   integer, parameter :: Npmax = 40  ! Npmax  -  Number of points in a shell
-  real(kind=rp), parameter :: kstart = 63.77d0 ! smallest wavenumber
-  real(kind=rp), parameter :: kend = 1660d0 ! largest wavenumber
+  real(kind=rp), parameter :: kstart = 63.77_rp ! smallest wavenumber
+  real(kind=rp), parameter :: kend = 1660.0_rp ! largest wavenumber
 
   integer, parameter :: fst_modes = 2 * nshells * Npmax ! No of freestream modes  
   integer :: shell_modes(nshells) ! Modes saved per shell    

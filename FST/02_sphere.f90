@@ -59,13 +59,13 @@ contains
     else if (Np.eq.4) then
       !let's have a tetraeder
       Np=4
-      call asp(x,y,z,1,-1.d0/6.d0*sqrt(3.d0),-0.5d0,0._rp)
-      call asp(x,y,z,2,-1.d0/6.d0*sqrt(3.d0),0.5d0,0.d0)
-      call asp(x,y,z,3,1.d0/3.d0*sqrt(3.d0),0.d0,0.d0)
-      call asp(x,y,z,4,0.d0,0.d0,1.d0/3.d0*sqrt(6.d0))
+      call asp(x,y,z,1,-1._rp/6._rp*sqrt(3._rp),-0.5_rp,0._rp)
+      call asp(x,y,z,2,-1._rp/6._rp*sqrt(3._rp),0.5_rp,0._rp)
+      call asp(x,y,z,3,1._rp/3._rp*sqrt(3._rp),0._rp,0._rp)
+      call asp(x,y,z,4,0._rp,0._rp,1._rp/3._rp*sqrt(6._rp))
 
-      call trans(x,y,z,Np,0._rp,0._rp,-sqrt(6.d0)/12.d0)
-      call scale1(x,y,z,Np,sqrt(6.d0)*2d0/3.d0)
+      call trans(x,y,z,Np,0._rp,0._rp,-sqrt(6._rp)/12._rp)
+      call scale1(x,y,z,Np,sqrt(6._rp)*2_rp/3._rp)
 
       Nl=6
       call asl(l,1,1,2)
@@ -79,15 +79,15 @@ contains
       !let's have a octaeder
 
       Np=6
-      call asp(x,y,z,1,0.d0,0.d0,sqrt(2.d0)/2.d0)
-      call asp(x,y,z,2,0.d0,1.d0,sqrt(2.d0)/2.d0)
-      call asp(x,y,z,3,1.d0,1.d0,sqrt(2.d0)/2.d0)
-      call asp(x,y,z,4,1.d0,0.d0,sqrt(2.d0)/2.d0)
-      call asp(x,y,z,5,0.5d0,0.5d0,0.d0)
-      call asp(x,y,z,6,0.5d0,0.5d0,sqrt(2.d0))
+      call asp(x,y,z,1,0._rp,0._rp,sqrt(2._rp)/2._rp)
+      call asp(x,y,z,2,0._rp,1._rp,sqrt(2._rp)/2._rp)
+      call asp(x,y,z,3,1._rp,1._rp,sqrt(2._rp)/2._rp)
+      call asp(x,y,z,4,1._rp,0._rp,sqrt(2._rp)/2._rp)
+      call asp(x,y,z,5,0.5_rp,0.5_rp,0._rp)
+      call asp(x,y,z,6,0.5_rp,0.5_rp,sqrt(2._rp))
 
-      call trans(x,y,z,Np,-0.5d0,-0.5d0,-sqrt(2._rp)/2._rp)
-      call scale1(x,y,z,Np,sqrt(2.d0))
+      call trans(x,y,z,Np,-0.5_rp,-0.5_rp,-sqrt(2._rp)/2._rp)
+      call scale1(x,y,z,Np,sqrt(2._rp))
 
 
       Nl=12
@@ -107,14 +107,14 @@ contains
     else if (Np.eq.8) then
       !let's have a cube
       Np=8
-      call asp(x,y,z,1,-sqrt(3.d0)/3.d0,sqrt(3.d0)/3.d0,-sqrt(3.d0)/3.d0)
-      call asp(x,y,z,2,-sqrt(3.d0)/3.d0,-sqrt(3.d0)/3.d0,-sqrt(3.d0)/3.d0)
-      call asp(x,y,z,3,sqrt(3.d0)/3.d0,-sqrt(3.d0)/3.d0,-sqrt(3.d0)/3.d0)
-      call asp(x,y,z,4,sqrt(3.d0)/3.d0,sqrt(3.d0)/3.d0,-sqrt(3.d0)/3.d0)
-      call asp(x,y,z,5,-sqrt(3.d0)/3.d0,sqrt(3.d0)/3.d0,sqrt(3.d0)/3.d0)
-      call asp(x,y,z,6,-sqrt(3.d0)/3.d0,-sqrt(3.d0)/3.d0,sqrt(3.d0)/3.d0)
-      call asp(x,y,z,7,sqrt(3.d0)/3.d0,-sqrt(3.d0)/3.d0,sqrt(3.d0)/3.d0)
-      call asp(x,y,z,8,sqrt(3.d0)/3.d0,sqrt(3.d0)/3.d0,sqrt(3.d0)/3.d0)
+      call asp(x,y,z,1,-sqrt(3._rp)/3._rp,sqrt(3._rp)/3._rp,-sqrt(3._rp)/3._rp)
+      call asp(x,y,z,2,-sqrt(3._rp)/3._rp,-sqrt(3._rp)/3._rp,-sqrt(3._rp)/3._rp)
+      call asp(x,y,z,3,sqrt(3._rp)/3._rp,-sqrt(3._rp)/3._rp,-sqrt(3._rp)/3._rp)
+      call asp(x,y,z,4,sqrt(3._rp)/3._rp,sqrt(3._rp)/3._rp,-sqrt(3._rp)/3._rp)
+      call asp(x,y,z,5,-sqrt(3._rp)/3._rp,sqrt(3._rp)/3._rp,sqrt(3._rp)/3._rp)
+      call asp(x,y,z,6,-sqrt(3._rp)/3._rp,-sqrt(3._rp)/3._rp,sqrt(3._rp)/3._rp)
+      call asp(x,y,z,7,sqrt(3._rp)/3._rp,-sqrt(3._rp)/3._rp,sqrt(3._rp)/3._rp)
+      call asp(x,y,z,8,sqrt(3._rp)/3._rp,sqrt(3._rp)/3._rp,sqrt(3._rp)/3._rp)
 
       Nl=12
       call asl(l,1,1,2)
@@ -133,22 +133,22 @@ contains
     else if (Np.eq.12) then
       !     let's have an ikosaeder
       Np=12
-      w=0.5*(sqrt(5.)+1.d0)
-      call asp(x,y,z,1,w/2.d0, 0.d0, 0.5d0*(w-1))
-      call asp(x,y,z,2,w/2.d0, 0.d0, 0.5d0*(w+1))
-      call asp(x,y,z,3,0.d0,0.5d0*(w-1.d0),0.5d0*w)
-      call asp(x,y,z,4,0.d0,0.5d0*(w+1.d0),0.5d0*w)
-      call asp(x,y,z,5,0.5d0*w,w,0.5d0*(w-1.d0))
-      call asp(x,y,z,6,0.5d0*w,w,0.5d0*(w+1.d0))
-      call asp(x,y,z,7,w,(w+1.d0)/2.,w/2.)
-      call asp(x,y,z,8,w,(w-1.d0)/2.,w/2.)
-      call asp(x,y,z,9,0.5*(w+1.d0), 0.5*w,w)
+      w=0.5*(sqrt(5.)+1._rp)
+      call asp(x,y,z,1,w/2._rp, 0._rp, 0.5_rp*(w-1))
+      call asp(x,y,z,2,w/2._rp, 0._rp, 0.5_rp*(w+1))
+      call asp(x,y,z,3,0._rp,0.5_rp*(w-1._rp),0.5_rp*w)
+      call asp(x,y,z,4,0._rp,0.5_rp*(w+1._rp),0.5_rp*w)
+      call asp(x,y,z,5,0.5_rp*w,w,0.5_rp*(w-1._rp))
+      call asp(x,y,z,6,0.5_rp*w,w,0.5_rp*(w+1._rp))
+      call asp(x,y,z,7,w,(w+1._rp)/2.,w/2.)
+      call asp(x,y,z,8,w,(w-1._rp)/2.,w/2.)
+      call asp(x,y,z,9,0.5*(w+1._rp), 0.5*w,w)
       call asp(x,y,z,10,0.5*(w-1),0.5*w,w)
-      call asp(x,y,z,11,0.5*(w+1),0.5*w,0.d0)
-      call asp(x,y,z,12,0.5*(w-1),0.5*w,0.d0)
+      call asp(x,y,z,11,0.5*(w+1),0.5*w,0._rp)
+      call asp(x,y,z,12,0.5*(w-1),0.5*w,0._rp)
 
       call trans(x,y,z,Np,-0.5*w,-0.5*w,-0.5*w)
-      call scale1(x,y,z,Np,2./(sqrt(w**2+1.d0)))
+      call scale1(x,y,z,Np,2./(sqrt(w**2+1._rp)))
 
 
 
@@ -189,29 +189,29 @@ contains
 
       w=0.5*(sqrt(5.)+3.)
       Np=20
-      call asp(x,y,z,1,0.5*w,0.5*(w-1.d0),0.d0)
-      call asp(x,y,z,2,.5*w,.5*(w+1.d0),0.d0)
-      call asp(x,y,z,3,w-0.5,w-.5,.5d0)
-      call asp(x,y,z,4,w,.5*w,.5*(w-1.d0))
-      call asp(x,y,z,5,w-.5,0.5d0,.5d0)
-      call asp(x,y,z,6,.5*(w+1.d0),0.d0,.5*w)
-      call asp(x,y,z,7,.5*(w-1.d0),0.d0,.5*w)
-      call asp(x,y,z,8,0.5d0,0.5d0,0.5d0)
-      call asp(x,y,z,9,0.d0,.5*w,(w-1.d0)*.5d0)
-      call asp(x,y,z,10,.5d0,w-.5d0,.5d0)
-      call asp(x,y,z,11,.5*(w-1.d0),w,.5*w)
-      call asp(x,y,z,12,.5*(w+1.d0),w,.5*w)
+      call asp(x,y,z,1,0.5*w,0.5*(w-1._rp),0._rp)
+      call asp(x,y,z,2,.5*w,.5*(w+1._rp),0._rp)
+      call asp(x,y,z,3,w-0.5,w-.5,.5_rp)
+      call asp(x,y,z,4,w,.5*w,.5*(w-1._rp))
+      call asp(x,y,z,5,w-.5,0.5_rp,.5_rp)
+      call asp(x,y,z,6,.5*(w+1._rp),0._rp,.5*w)
+      call asp(x,y,z,7,.5*(w-1._rp),0._rp,.5*w)
+      call asp(x,y,z,8,0.5_rp,0.5_rp,0.5_rp)
+      call asp(x,y,z,9,0._rp,.5*w,(w-1._rp)*.5_rp)
+      call asp(x,y,z,10,.5_rp,w-.5_rp,.5_rp)
+      call asp(x,y,z,11,.5*(w-1._rp),w,.5*w)
+      call asp(x,y,z,12,.5*(w+1._rp),w,.5*w)
       call asp(x,y,z,13,w-.5,w-.5,w-.5)
-      call asp(x,y,z,14,w,.5*w,.5*(w+1.d0))
-      call asp(x,y,z,15,w-.5,.5d0,w-.5)
-      call asp(x,y,z,16,.5*w,.5*(w-1.d0),w)
-      call asp(x,y,z,17,.5d0,.5d0,w-.5d0)
-      call asp(x,y,z,18,0.d0,.5*w,.5*(w+1.d0))
-      call asp(x,y,z,19,.5d0,w-.5,w-.5)
-      call asp(x,y,z,20,.5d0*w,.5*(w+1.d0),w)
+      call asp(x,y,z,14,w,.5*w,.5*(w+1._rp))
+      call asp(x,y,z,15,w-.5,.5_rp,w-.5)
+      call asp(x,y,z,16,.5*w,.5*(w-1._rp),w)
+      call asp(x,y,z,17,.5_rp,.5_rp,w-.5_rp)
+      call asp(x,y,z,18,0._rp,.5*w,.5*(w+1._rp))
+      call asp(x,y,z,19,.5_rp,w-.5,w-.5)
+      call asp(x,y,z,20,.5_rp*w,.5*(w+1._rp),w)
 
       call trans(x,y,z,Np,-0.5*w,-0.5*w,-0.5*w)
-      call scale1(x,y,z,Np,2./(sqrt(w**2+1.d0)))
+      call scale1(x,y,z,Np,2./(sqrt(w**2+1._rp)))
 
       Nl=30
       call asl(l,1,1,2)
@@ -252,7 +252,7 @@ contains
 
       Npp=Np
 
-      Nn=(1.d0+sqrt(-3.+2.*Npp))/2.
+      Nn=(1._rp+sqrt(-3.+2.*Npp))/2.
       Nn = Nn*2
       Npn =  real(Nn, kind=rp)**2./2.-real(Nn, kind=rp)+2.
       if (file) then
@@ -273,7 +273,7 @@ contains
       k=1
       x(k)=0.
       y(k)=0.
-      z(k)=1.d0
+      z(k)=1._rp
       do j=1, Nn/2-1
         do i=1, (Nn)
           k=k+1
@@ -285,7 +285,7 @@ contains
       k=k+1
       x(k)=0.
       y(k)=0.
-      z(k)=-1.d0
+      z(k)=-1._rp
 
       k=0
       do i=2, Nn+1
@@ -328,7 +328,7 @@ contains
         else
           dphi = dtheta / sin(theta)
         end if
-        Nphir = max(2*pi / dphi ,1.d0)
+        Nphir = max(2*pi / dphi ,1._rp)
         Nphi = Nphir+0.5
         dphi = 2*pi / real(Nphi, kind=rp)
         Npn=Npn+Nphi
@@ -361,7 +361,7 @@ contains
         else
           dphi = dtheta / sin(theta)
         end if
-        Nphir = max(2*pi / dphi ,1.d0)
+        Nphir = max(2*pi / dphi ,1._rp)
         Nphi = Nphir+0.5
         dphi = 2*pi / real(Nphi, kind=rp)
         do i=1, (Nphi)

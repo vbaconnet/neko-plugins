@@ -56,9 +56,9 @@ module fst_bc_driver
     type(field_t), pointer :: fu,fv,fw
     character(len=:), allocatable :: read_str, fname
     logical :: px, py, pz
-    real(kind=rp) :: x, ymin, ymax, zmin, zmax, amp
+    real(kind=xp) :: x, ymin, ymax, zmin, zmax, delta_y, delta_z, Ly, Lz
     integer :: i, idx, ierr, n
-    real(kind=rp) :: alpha, t_ramp, t_start, delta_y, delta_z, delta_x
+    real(kind=rp) :: alpha, t_ramp, t_start, amp
 
     call json_get_or_default(params, "case.FST.enabled", ENABLED, .true.)
 
@@ -76,8 +76,8 @@ module fst_bc_driver
     ! on which one is periodic we will set a fringe or not.
     ymin = 99.0_rp
     ymax = -99_rp
-    zmin = -99.0_rp
-    zmax = 99.0_rp
+    zmin = 99.0_rp
+    zmax = -99.0_rp
 
     ! Search for min and max
     do i = 1, u%msh%mpts
@@ -96,24 +96,37 @@ module fst_bc_driver
     call MPI_Allreduce(MPI_IN_PLACE, zmax, 1, &
          MPI_REAL_PRECISION, MPI_MAX, NEKO_COMM, ierr)
 
-    ! Read parameters for the FST fringe
-    call json_get(params, "case.FST.alpha", alpha)
-    call json_get(params, "case.FST.t_ramp", t_ramp)
-    call json_get_or_default(params, "case.FST.t_start", t_start, 0.0_rp)
+    Ly = ymax - ymin
+    Lz = zmax - zmin
 
-    ! Set the fringe ramp_in length depending on wether or not we are periodic.
-    ! If periodic, then we set a negative to artificially "apply everywhere"
+    ! Read parameters for the FST fringe in space
+    call json_get(params, "case.FST.alpha", alpha)
+
+
+    ! In the periodic direction(s) there should not be any fringe. To do this
+    ! I artificially set huge min/max values so that the boundary we are applying
+    ! on is always in the region where the fringe is = 1
     if (py) then
-       delta_y = -99.0_rp * (ymax - ymin)
+       ymin = ymin - 999.0_rp*Ly
+       ymax = ymax + 999.0_rp*Ly
+       Ly = ymax - ymin
+       delta_y = 0.01_xp*Ly
     else
-       delta_y = alpha * (ymax - ymin)
+       delta_y = alpha*Ly
     end if
 
     if (pz) then
-       delta_z = -99.0_rp * (zmax - zmin)
+       zmin = zmin - 999.0_rp*Lz
+       zmax = zmax + 999.0_rp*Lz
+       Lz = zmax - zmin
+       delta_z = 0.01_xp*Lz
     else
-       delta_z = alpha * (zmax - zmin)
+       delta_z = alpha * Lz
     end if
+    
+    ! Read parameters for the FST fringe in time
+    call json_get(params, "case.FST.t_ramp", t_ramp)
+    call json_get_or_default(params, "case.FST.t_start", t_start, 0.0_rp)
 
     ! Initialize the fst parameters
     call FST_OBJ%init_bc(zmin, zmax, delta_z, delta_z, ymin, ymax, delta_y, &
@@ -121,36 +134,46 @@ module fst_bc_driver
 
   end subroutine fst_bc_driver_initialize
 
-  subroutine fst_bc_driver_apply(u, v, w, bc, coef, t, tstep, angle)
+  subroutine fst_bc_driver_apply(u, v, w, bc, coef, t, tstep, angle, memcpy)
     type(field_t), intent(inout) :: u
     type(field_t), intent(inout) :: v
     type(field_t), intent(inout) :: w
-    class(bc_t), target, intent(in) :: bc
+    class(bc_t), intent(in) :: bc
     type(coef_t), intent(inout) :: coef
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
     real(kind=rp), intent(in) :: angle
+    logical, intent(in), optional :: memcpy
 
     integer :: i, idx
-    class(bc_t), pointer :: u_bc
 
     if (.not. ENABLED) return
-
-    u_bc => bc
 
     !
     ! At the first timestep we generate the FST based
     ! on the boundry mask!
     !
     if (tstep .eq. 1) then
-       call FST_obj%generate_bc(coef, u_bc%msk, u_bc%msk(0), u=u, v=v, w=w)
+       call FST_obj%generate_bc(coef, bc%msk, bc%msk(0), u=u, v=v, w=w)
     end if
 
     ! Then, apply the free stream turbulence that will add on
     ! top of the existing baseflow.
     ! NOTE: it does not copy to the GPU
-    call FST_obj%apply_BC(u_bc%msk, u_bc%msk(0), &
+    call FST_obj%apply_BC(bc%msk, bc%msk(0), &
          u%dof%x, u%dof%y, u%dof%z, t, u%x, v%x, w%x, angle)
+
+    ! if not copy to memory, return here
+    if (.not. memcpy) return
+
+    if (neko_bcknd_device .eq. 1) then
+       call device_memcpy(u%x, u%x_d, u%dof%size(), &
+               host_to_device, sync = .false.)
+       call device_memcpy(v%x, v%x_d, v%dof%size(), &
+               host_to_device, sync = .false.)
+       call device_memcpy(w%x, w%x_d, w%dof%size(), &
+               host_to_device, sync = .true.)
+    end if
 
   end subroutine fst_bc_driver_apply
 

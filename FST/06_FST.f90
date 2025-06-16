@@ -10,10 +10,7 @@ module FST
   use turbu
   use utils, only: neko_error
   use point_zone, only: point_zone_t
-  use device, only: HOST_TO_DEVICE, device_free, device_memcpy, &
-          device_map
-  use neko_config, only: NEKO_BCKND_DEVICE
-  use, intrinsic :: iso_c_binding
+
   implicit none
 
 
@@ -51,12 +48,15 @@ module FST
      logical :: is_bc
 
      !> Fringe in space
-     type(vector_t) :: fringe_space
+     real(kind=rp), allocatable :: fringe_space(:)
 
      !> Baseflows, if applying on a non-uniform inflow
-     type(vector_t) :: u_baseflow
-     type(vector_t) :: v_baseflow
-     type(vector_t) :: w_baseflow
+     real(kind=rp), allocatable :: u_baseflow(:)
+     real(kind=rp), allocatable :: v_baseflow(:)
+     real(kind=rp), allocatable :: w_baseflow(:)
+
+     !> Variable that is precomputed to save some time
+     real(kind=rp), allocatable :: phi_0(:,:)
 
    contains
 
@@ -202,10 +202,12 @@ contains
   subroutine FST_free_params(this)
     class(FST_t), intent(inout) :: this
 
-    call this%u_baseflow%free()
-    call this%v_baseflow%free()
-    call this%w_baseflow%free()
-    call this%fringe_space%free()
+    if(allocated(this%fringe_space)) deallocate(this%fringe_space)
+    if(allocated(this%phi_0)) deallocate(this%phi_0)
+
+    if (allocated(this%u_baseflow)) deallocate(this%u_baseflow)
+    if (allocated(this%v_baseflow)) deallocate(this%v_baseflow)
+    if (allocated(this%w_baseflow)) deallocate(this%w_baseflow)
 
   end subroutine FST_free_params
 
@@ -242,26 +244,20 @@ contains
 
     integer :: i, idx
 
-    call this%u_baseflow%init(n)
-    call this%v_baseflow%init(n)
-    call this%w_baseflow%init(n)
+    if (allocated(this%u_baseflow)) deallocate(this%u_baseflow)
+    if (allocated(this%v_baseflow)) deallocate(this%v_baseflow)
+    if (allocated(this%w_baseflow)) deallocate(this%w_baseflow)
 
-    ! Could use a gather/scatter copy here?
+    allocate(this%u_baseflow(n))
+    allocate(this%v_baseflow(n))
+    allocate(this%w_baseflow(n))
+
     do i = 1, n
        idx = mask(i)
-       this%u_baseflow%x(i) = u%x(idx,1,1,1)
-       this%v_baseflow%x(i) = v%x(idx,1,1,1)
-       this%w_baseflow%x(i) = w%x(idx,1,1,1)
+       this%u_baseflow(i) = u%x(idx,1,1,1)
+       this%v_baseflow(i) = v%x(idx,1,1,1)
+       this%w_baseflow(i) = w%x(idx,1,1,1)
     end do
-
-    if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_memcpy(this%u_baseflow%x, this%u_baseflow%x_d, &
-               this%u_baseflow%size(), HOST_TO_DEVICE, sync=.false.)
-       call device_memcpy(this%v_baseflow%x, this%v_baseflow%x_d, &
-               this%v_baseflow%size(), HOST_TO_DEVICE, sync=.false.)
-       call device_memcpy(this%w_baseflow%x, this%w_baseflow%x_d, &
-               this%w_baseflow%size(), HOST_TO_DEVICE, sync=.false.)
-    end if
 
   end subroutine FST_apply_baseflow
 
@@ -278,17 +274,17 @@ contains
     call MPI_Bcast(k_length , 1                   , &
          MPI_INTEGER         , 0, NEKO_COMM, ierr)
     call MPI_Bcast(k_num_all, fst_modes*coef%msh%gdim, &
-         MPI_DOUBLE_PRECISION, 0, NEKO_COMM, ierr)
+         MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
     call MPI_Bcast(k_num    , fst_modes*coef%msh%gdim, &
-         MPI_DOUBLE_PRECISION, 0, NEKO_COMM, ierr)
+         MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
     call MPI_Bcast(u_hat_pn , fst_modes*coef%msh%gdim, &
-         MPI_DOUBLE_PRECISION, 0, NEKO_COMM, ierr)
+         MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
     call MPI_Bcast(bb       , fst_modes*coef%msh%gdim, &
-         MPI_DOUBLE_PRECISION, 0, NEKO_COMM, ierr)
+         MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
     call MPI_Bcast(shell    , fst_modes           , &
          MPI_INTEGER         , 0, NEKO_COMM, ierr)
     call MPI_Bcast(shell_amp, nshells             , &
-         MPI_DOUBLE_PRECISION, 0, NEKO_COMM, ierr)
+         MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
 
     call neko_log%end_section('Done --> Generating FST')
 
@@ -343,7 +339,7 @@ contains
 
     character(len=LOG_SIZE) :: log_buf
     real(kind=rp) :: x, y, z
-    integer :: ierr, i, idx
+    integer :: ierr, i, idx, m, j
 
     ! Do the general generation
     call this%generate_common(coef)
@@ -371,6 +367,20 @@ contains
           this%fringe_space(idx) = fringe(z, y, this)
        end if
 
+    end do
+
+    !
+    ! Precompute time-independent term
+    ! 
+    allocate(this%phi_0(k_length, bc_mask(0)))
+
+    do j = 1, bc_mask(0)
+      x = coef%dof%x(bc_mask(j), 1,1,1)
+      y = coef%dof%y(bc_mask(j), 1,1,1)
+      z = coef%dof%z(bc_mask(j), 1,1,1)
+      do m = 1, k_length
+        this%phi_0(m,j) = k_num_all(m,1)*x + k_num_all(m,2)*y + k_num_all(m,3)*z + bb(m,1) ! bb is phase_shift
+      end do  
     end do
 
   end subroutine FST_generate_bc
@@ -451,10 +461,13 @@ contains
 
     integer :: idx, l, m, i, shellno
     integer, parameter :: gdim = 3
-    real(kind=rp) :: phase_shft, phi, amp, pert, urand, vrand, wrand
-    real(kind=rp) :: rand_vec(gdim), fringe_time, vel_mag
+    real(kind=xp) :: phase_shft, phi, amp, pert, urand, vrand, wrand
+    real(kind=xp) :: rand_vec(gdim), fringe_time, vel_mag, cosa, sina, phi_t
 
     fringe_time = time_ramp(t, this%t_end, this%t_start)
+    cosa = cos(angleXY)
+    sina = sin(angleXY)
+    phi_t = glb_uinf*t
 
     ! Loop on all points in the point zone
     do idx = 1, bc_mask(0)
@@ -468,14 +481,16 @@ contains
        do m = 1, k_length
 
           ! Random phase shifts
-          phase_shft = bb(m,1)
+          !phase_shft = bb(m,1)
 
           ! kx(x - U*t) + ky*y + kz*z + phi
           ! = kx*x + ky*y + kz*z - kx*U*t + phi
-          phi = k_num_all(m,1) * (x(i,1,1,1) - glb_uinf*t) + &
-               k_num_all(m,2) *  y(i,1,1,1) + &
-               k_num_all(m,3) *  z(i,1,1,1) + &
-               phase_shft
+          !phi = k_num_all(m,1) * (x(i,1,1,1) - glb_uinf*t) + &
+          !     k_num_all(m,2) *  y(i,1,1,1) + &
+          !     k_num_all(m,3) *  z(i,1,1,1) + &
+          !     phase_shft
+          
+          phi = this%phi_0(m,idx) - k_num_all(m,1)*phi_t
 
           shellno = shell(m)
 
@@ -488,8 +503,8 @@ contains
        enddo
 
        ! Project the rand_vec if there is a rotation
-       urand = rand_vec(1)*cos(angleXY) - rand_vec(2)*sin(angleXY)
-       vrand = rand_vec(1)*sin(angleXY) + rand_vec(2)*cos(angleXY)
+       urand = rand_vec(1)*cosa - rand_vec(2)*sina
+       vrand = rand_vec(1)*sina + rand_vec(2)*cosa
        wrand = rand_vec(3)
 
        u_bc(i,1,1,1) = this%u_baseflow(idx) + &
@@ -567,10 +582,10 @@ contains
     integer :: i
     character :: a
 
-    fr = f%fringe_max * ( S((x-f%xstart)/f%x_delta_rise) - S((x-f%xend)/f%x_delta_fall + 1d0) )
+    fr = f%fringe_max * ( S((x-f%xstart)/f%x_delta_rise) - S((x-f%xend)/f%x_delta_fall + 1.0_rp) )
 
     if (present(y)) then
-       fr = fr * ( S((y-f%ystart)/f%y_delta_rise) - S((y-f%yend)/f%y_delta_fall + 1d0) )
+       fr = fr * ( S((y-f%ystart)/f%y_delta_rise) - S((y-f%yend)/f%y_delta_fall + 1._rp) )
     end if
 
   end function fringe
@@ -580,12 +595,12 @@ contains
     real(kind=rp), intent(in) :: x
     real(kind=rp)             :: y
 
-    if ( x.le.0d0 ) then
-       y = 0d0
-    else if ( x.ge.1d0 ) then
-       y = 1d0
+    if ( x.le.0._rp ) then
+       y = 0._rp
+    else if ( x.ge.1._rp ) then
+       y = 1._rp
     else
-       y = 1d0 / (1d0 + exp( 1d0/(x-1d0) + 1d0/x))
+       y = 1._rp / (1._rp + exp( 1._rp/(x-1._rp) + 1._rp/x))
     end if
 
   end function S

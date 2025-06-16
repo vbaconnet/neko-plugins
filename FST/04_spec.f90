@@ -82,9 +82,9 @@ contains
     Ndk   = 5000    ! just a large no of points on the spectrum
     dkint = (kend-kstart)/float(Ndk)
     
-    tke_tot1 = (ek(kstart,fst_il,1.d0) + ek(kend,fst_il,1.d0))
+    tke_tot1 = (ek(kstart,fst_il,1._rp) + ek(kend,fst_il,1._rp))
     do i=1,Ndk-1
-      tke_tot1 = tke_tot1 + ek(kstart + i*dkint, fst_il, 1.d0)
+      tke_tot1 = tke_tot1 + ek(kstart + i*dkint, fst_il, 1._rp)
     end do
     tke_tot1 = tke_tot1*dkint
     call print_param('FST - integrated energy in spectrum ',tke_tot1)
@@ -94,7 +94,7 @@ contains
     dkint = (kend - kstart)/real(nshells-1)
     tke_tot = 0.
     do i=1,nshells
-      tke_tot = tke_tot + ek(kstart + (i-1)*dkint,fst_il,1.d0)
+      tke_tot = tke_tot + ek(kstart + (i-1)*dkint,fst_il,1._rp)
     end do
     tke_tot = tke_tot*dkint
     write (log_buf, *) 'FST - discretized on ', nshells, ' shells :' , tke_tot
@@ -357,44 +357,44 @@ contains
 
       do j=1,np
         !          kn = nint(kx(j)*dlx/(2.0*pi))
-        kn = sign(1d0, kx(j)) * floor(abs(kx(j))*dlx/(2.0*pi))  ! always
+        kn = sign(1.0_rp, kx(j)) * floor(abs(kx(j))*dlx/(2.0_rp*pi))  ! always
                                                               ! make k
                                                               ! smaller   
 
         if (abs(kn).gt.nmax) then
-          kn=kn-sign(1.0d0,kx(j))
+          kn=kn-sign(1.0_rp,kx(j))
         elseif (abs(kn).eq.0) then
-          kn=kn+sign(1.0d0,kx(j))
+          kn=kn+sign(1.0_rp,kx(j))
         endif
-        kx(j)=real(kn)*2.0*pi/dlx
+        kx(j)=real(kn)*2.0_rp*pi/dlx
 
         flip = ran2(seed)            ! coin toss
-        if (flip.gt.0.5) then
+        if (flip.gt.0.5_rp) then
           ky(j) = ky(j)       ! ky stays the same
-          rtmp = k2-ky(j)**2.-kx(j)**2.
+          rtmp = k2-ky(j)**2.0_rp-kx(j)**2.0_rp
           if (rtmp.gt.1) then
-            kz(j) = sign(1.0d0,kz(j))*sqrt(rtmp)
+            kz(j) = sign(1.0_rp,kz(j))*sqrt(rtmp)
           else
-            rtmp = sqrt((k2-kx(j)**2.)/2.)
-            ky(j) = sign(1.0d0,ky(j))*rtmp
-            kz(j) = sign(1.0d0,kz(j))*rtmp
+            rtmp = sqrt((k2-kx(j)**2.0_rp)/2.0_rp)
+            ky(j) = sign(1.0_rp,ky(j))*rtmp
+            kz(j) = sign(1.0_rp,kz(j))*rtmp
           endif
         else
           kz(j) = kz(j)       ! kz stays the same
-          rtmp = k2-kx(j)**2.-kz(j)**2.
+          rtmp = k2-kx(j)**2.0_rp-kz(j)**2.0_rp
           if (rtmp.gt.1) then                 
-            ky(j) = sign(1.0d0,ky(j))*sqrt(rtmp)
+            ky(j) = sign(1.0_rp,ky(j))*sqrt(rtmp)
           else
-            rtmp = sqrt((k2-kx(j)**2.)/2.)
-            ky(j) = sign(1.0d0,ky(j))*rtmp
-            kz(j) = sign(1.0d0,kz(j))*rtmp
+            rtmp = sqrt((k2-kx(j)**2.0_rp)/2.0_rp)
+            ky(j) = sign(1.0_rp,ky(j))*rtmp
+            kz(j) = sign(1.0_rp,kz(j))*rtmp
           endif
         endif       ! flip 
       enddo         ! j=1,Np
 
    end if
     if (ifyp) then
-      nmax = floor(kk*dly/(2.0*pi))
+      nmax = floor(kk*dly/(2.0_rp*pi))
       nmin = 1
       if (nmax.lt.nmin) then
         call neko_log%message('Check allowed wavenumbers in FST')
@@ -406,15 +406,15 @@ contains
 
       do j=1,np
         !          kn = nint(ky(j)*dly/(2.0*pi))
-        kn = sign(1.0d0,ky(j))*floor(abs(ky(j))*dly/(2.0*pi))  ! always
+        kn = sign(1.0_rp,ky(j))*floor(abs(ky(j))*dly/(2.0*pi))  ! always
                                                               ! make k
                                                               ! smaller   
 
 
         if (abs(kn).gt.nmax) then
-          kn=kn-sign(1.0d0,ky(j))
+          kn=kn-sign(1.0_rp,ky(j))
         elseif (abs(kn).eq.0) then
-          kn=kn+sign(1.0d0,ky(j))
+          kn=kn+sign(1.0_rp,ky(j))
         endif
         ky(j)=real(kn)*2.0*pi/dly
 
@@ -423,21 +423,21 @@ contains
           kz(j) = kz(j)       ! kz stays the same
           rtmp = k2-ky(j)**2.-kz(j)**2.
           if (rtmp.gt.1) then
-            kx(j) = sign(1.0d0,kx(j))*sqrt(rtmp)
+            kx(j) = sign(1.0_rp,kx(j))*sqrt(rtmp)
           else
             rtmp = sqrt((k2-ky(j)**2.)/2.)
-            kx(j) = sign(1.0d0,kx(j))*rtmp
-            kz(j) = sign(1.0d0,kz(j))*rtmp
+            kx(j) = sign(1.0_rp,kx(j))*rtmp
+            kz(j) = sign(1.0_rp,kz(j))*rtmp
           endif
         else
           kx(j) = kx(j)       ! kx stays the same
           rtmp = k2-ky(j)**2.-kx(j)**2.
           if (rtmp.gt.1) then                 
-            kz(j) = sign(1.0d0,kz(j))*sqrt(rtmp)
+            kz(j) = sign(1.0_rp,kz(j))*sqrt(rtmp)
           else
             rtmp = sqrt((k2-ky(j)**2.)/2.)
-            kx(j) = sign(1.0d0,kx(j))*rtmp
-            kz(j) = sign(1.0d0,kz(j))*rtmp
+            kx(j) = sign(1.0_rp,kx(j))*rtmp
+            kz(j) = sign(1.0_rp,kz(j))*rtmp
           endif
         endif       ! flip 
       enddo         ! j=1,Np
@@ -455,13 +455,13 @@ contains
       endif  
 
       do j=1,np
-        kn = sign(1.0d0,kz(j))*floor(abs(kz(j))*dlz/(2.0*pi))  ! always
+        kn = sign(1.0_rp,kz(j))*floor(abs(kz(j))*dlz/(2.0*pi))  ! always
                                                               ! make k
                                                               ! smaller   
         if (abs(kn).gt.nmax) then
-          kn=kn-sign(1.0d0,kz(j))
+          kn=kn-sign(1.0_rp,kz(j))
         elseif (abs(kn).eq.0) then
-          kn=kn+sign(1.0d0,kz(j))
+          kn=kn+sign(1.0_rp,kz(j))
         endif
         kz(j)=real(kn)*2.0*pi/dlz
 
@@ -470,21 +470,21 @@ contains
           kx(j) = kx(j)       ! kx stays the same
           rtmp = k2-kx(j)**2.-kz(j)**2.
           if (rtmp.gt.1) then
-            ky(j) = sign(1.0d0,ky(j))*sqrt(rtmp)
+            ky(j) = sign(1.0_rp,ky(j))*sqrt(rtmp)
           else
             rtmp = sqrt((k2-kz(j)**2.)/2.)
-            kx(j) = sign(1.0d0,kx(j))*rtmp
-            ky(j) = sign(1.0d0,ky(j))*rtmp
+            kx(j) = sign(1.0_rp,kx(j))*rtmp
+            ky(j) = sign(1.0_rp,ky(j))*rtmp
           endif
         else
           ky(j) = ky(j)       ! ky stays the same
           rtmp = k2-ky(j)**2.-kz(j)**2.
           if (rtmp.gt.1) then                 
-            kx(j) = sign(1.0d0,kx(j))*sqrt(rtmp)
+            kx(j) = sign(1.0_rp,kx(j))*sqrt(rtmp)
           else
             rtmp = sqrt((k2-kz(j)**2.)/2.)
-            kx(j) = sign(1.0d0,kx(j))*rtmp
-            ky(j) = sign(1.0d0,ky(j))*rtmp
+            kx(j) = sign(1.0_rp,kx(j))*rtmp
+            ky(j) = sign(1.0_rp,ky(j))*rtmp
           endif
         endif       ! flip 
 
