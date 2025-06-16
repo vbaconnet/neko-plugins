@@ -11,52 +11,58 @@ comm = MPI.COMM_WORLD
 # Data types
 from pysemtools.datatypes.msh import Mesh
 from pysemtools.datatypes.coef import Coef
-from pysemtools.datatypes.field import FieldRegistry
+from pysemtools.datatypes.field import Field
 
 from pysemtools.datatypes.utils import create_hexadata_from_msh_fld
 # Readers
-from pysemtools.io.ppymech.neksuite import pynekread, pwritenek
+from pysemtools.io.ppymech.neksuite import pynekread, pwritenek, pynekwrite
 
 # Adios2 wrappers
 from pysemtools.io.adios2.compress import write_field, read_field
 
-fname = join("compress",'compressed_field0.f00000')
 
-# Instance the empty objects
-msh = Mesh(comm, create_connectivity=False)
+# ===== Parameters
 
-# Read the data
-msh,fld = read_field(comm, fname)
+compressed_snapshots_dir = "./"
+decompressed_snapshots_dir = "./"
 
-out = create_hexadata_from_msh_fld(msh=msh, fld=fld)
-pwritenek("yayaya.f00000", out, comm)
+compressed_prefix = "compressed_field"
+decompressed_prefix = "decompressed_field"
 
-exit(0)
+start_counter = 0
+Nsnaps = 5
 
-for i in range(int(sys.argv[1])):
+# =====
 
-    fname = "field0.f{:05d}".format(i)
-    fname = join("snaps", fname)
-    
-    fld = FieldRegistry(comm)
-    
+fld = Field(comm)
+msh = Mesh(comm)
+
+#
+# Read compressed field
+#
+
+for i in range(start_counter, start_counter + Nsnaps):
+
+    fname = join(compressed_snapshots_dir, f'{compressed_prefix}0.f'+'{:05d}'.format(i))
+
     # Read the data
-    pynekread(fname, comm, data_dtype=np.single, fld = fld)
-
-    # Write the data in a subdomain and with a different order than what was read
-    fout = './compressed_field0.f{:05d}'.format(i)
-    fout = join("compress", fout)
-    
-    wrd_size = 4
-    if i == 0:
-        write_field(comm, msh=msh, fld=fld, fname=fout, wrd_size=wrd_size, write_mesh = True)
+    if i == start_counter:
+        #_, fld = read_field(comm, fname)
+        read_field(comm, fname, msh=msh, fld=fld, overwrite_fld = True)
     else:
-        write_field(comm, msh=msh, fld=fld, fname=fout, wrd_size=wrd_size, write_mesh = False)
+        read_field(comm, fname, fld=fld, overwrite_fld = True)
+        #msh, fld = read_field(comm, fname)
 
-    # Uncomment below to test if the read compressed file is correct
-    #comm.Barrier()
-    #msh2, fld2 = read_field(comm, fname = fout)
-    #print(np.allclose(msh.x, msh2.x))
-    #print(np.allclose(fld.fields['vel'][0], fld2.fields['vel'][0]))
-    
-if comm.Get_rank() == 0: print("DONE")
+    for k in fld.fields.keys():
+        print(k, len(fld.fields[k]))
+
+    #
+    # Write decompressed field
+    #
+    fout = join(decompressed_snapshots_dir, f"{decompressed_prefix}0.f" + "{:05d}".format(i))
+    if comm.Get_rank() == 0: print("Writing to ", fout, "...")
+    if i == start_counter:
+        pynekwrite(fout, comm, msh=msh, fld=fld, wdsz=4, write_mesh=True)
+    else:
+        pynekwrite(fout, comm, msh=msh, fld=fld, wdsz=4, write_mesh=False)
+    if comm.Get_rank() == 0: print("Writing to ", fout, "... done")
