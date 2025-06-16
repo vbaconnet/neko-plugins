@@ -8,8 +8,7 @@ import sys
 try:
     fname = sys.argv[1]
 except:
-    raise ValueError("Need to put the file name in argument! e.g. field0.f00100")
-
+    raise ValueError("Missing field file name, e.g. field0.f00100")
 
 # Get mpi info
 comm = MPI.COMM_WORLD
@@ -30,6 +29,7 @@ from pysemtools.datatypes.utils import extrude_2d_sem_mesh
 # Extrude the 2D mesh to 3D
 msh3d, fld3d = extrude_2d_sem_mesh(comm, lz = msh.lx, msh = msh, fld = fld)
 
+# add zero z-velocity field to the 3d output
 fld3d.fields["vel"].append( np.zeros_like( fld3d.fields["vel"][0] ) )
 
 pynekwrite("2d_extruded_"+fname, comm, msh=msh3d, fld=fld3d)
