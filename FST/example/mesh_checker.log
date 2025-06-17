@@ -1,0 +1,46 @@
+
+    _  __  ____  __ __  ____  
+   / |/ / / __/ / //_/ / __ \ 
+  /    / / _/  / ,<   / /_/ / 
+ /_/|_/ /___/ /_/|_|  \____/  
+
+ (version: 0.9.99)
+ (build: 2025-06-10 on x86_64-pc-linux-gnu using gnu)
+
+
+ -------------Mesh-------------
+ Reading a binary Neko file box.nmsh
+ gdim = 3, nelements =      1000
+ Reading elements
+ Reading BC/zone data
+ Reading deformation data
+ Mesh read, setting up connectivity
+ Done setting up mesh and connectivity
+ Mesh and connectivity setup (excluding read) time (s):  0.005789
+ 
+ --------------Size-------------
+ Number of elements:         1000
+ Number of points:           1331
+ Number of faces:            3200
+ Number of edges:            3410
+ Bounding box:
+    x-0.200     -0.208E-16
+    y-0.100      0.100    
+    z-0.750E-01  0.750E-01
+ 
+ --------------Zones------------
+ Number of periodic faces: 200
+ 
+ Labeled zones: 
+    Zone  1: 100 faces
+    Zone  2: 100 faces
+    Zone  3: 100 faces
+    Zone  4: 100 faces
+ Writing zone ids to zone_indices0.f00000
+
+ --------Gather-Scatter--------
+ Comm         :          MPI
+ Avg. internal:        25600
+ Avg. external:            0
+ Backend      :          std
+ Done

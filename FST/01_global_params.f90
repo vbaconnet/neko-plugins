@@ -4,7 +4,7 @@ module global_params
 
   implicit none
 
-  real(kind=rp) :: glb_uinf = 6.0_rp
+  real(kind=rp) :: glb_uinf = 1.0_rp
   real(kind=rp) :: fst_ti = 3.7d-2 ! turbulence intensity
   real(kind=rp) :: fst_il = 11.53d-3 ! integral length scale		
 
