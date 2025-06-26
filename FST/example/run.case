@@ -2,73 +2,80 @@
   "version": 1.0,
   "case":
   {
-  "mesh_file": "box.nmsh",
-  "output_directory": "results",
-  "end_time": 0.3,
-  "output_at_end": true,
-  "output_checkpoints": true,
-  "checkpoint_control": "simulationtime",
-  "checkpoint_value": 1.0,
-  "variable_timestep": true,
-  "timestep": 0.25e-2,
-  "max_timestep": 0.25e-2,
-  "numerics": {
-    "time_order": 3,
-    "polynomial_order": 5,
-    "dealias": true
-  },
-
-  "FST": {
-    "enabled": "true",
-    "t_start": 0.00,
-    "t_ramp": 0.001,
-    "alpha": 0.2,
-    "periodic_z": true
-  },
-
-  "fluid": {
-    "scheme": "pnpn",
-    "Re": 3000,
-    "initial_condition": {
-      "type": "uniform",
-      "value": [1.0,0.0,0.0]
+    "mesh_file": "box.nmsh",
+    "output_directory": "results",
+    "output_at_end": true,
+    "output_checkpoints": true,
+    "checkpoint_control": "simulationtime",
+    "checkpoint_value": 1.0,
+    "time": {
+      "end_time": 0.3,
+      "variable_timestep": true,
+      "timestep": 0.25e-2,
+      "max_timestep": 0.25e-2
     },
-    "velocity_solver": {
-      "type": "cg",
-      "preconditioner": {
+    "numerics": {
+      "time_order": 3,
+      "polynomial_order": 5,
+      "dealias": true
+    },
+
+    "FST": {
+      "enabled": false, // !!! FST IS DISABLED !!
+      "t_start": 0.00,
+      "t_ramp": 0.001,
+      "alpha": 0.05,
+      "periodic_z": true
+    },
+
+    "fluid": {
+      "scheme": "pnpn",
+      "Re": 3000,
+      "initial_condition": {
+        "type": "field",
+        "file_name": "IC/field0.f00008",
+        "mesh_file_name": "IC/field0.f00000",
+        "interpolate": true
+      },
+      "velocity_solver": {
+        "type": "cg",
+        "preconditioner": {
           "type": "jacobi"
+        },
+        "absolute_tolerance": 1e-3,
+        "max_iterations": 50,
+        "projection_space_size": 0
       },
-      "absolute_tolerance": 1e-3,
-      "max_iterations": 50,
-      "projection_space_size": 0,
-    },
-    "pressure_solver": {
-      "type": "gmres",
-      "preconditioner": {
+      "pressure_solver": {
+        "type": "gmres",
+        "preconditioner": {
           "type": "hsmg"
+        },
+        "projection_space_size": 0,
+        "absolute_tolerance": 1e-3,
+        "max_iterations": 50
       },
-      "projection_space_size": 0,
-      "absolute_tolerance": 1e-3,
-      "max_iterations": 50
-    },
-    "output_control": "tsteps",
-    "output_value": 50,
-    "boundary_conditions": [
-      {
+      "output_control": "tsteps",
+      "output_value": 50,
+      "boundary_conditions": [
+        {
+        // inflow
         "type": "user_velocity",
         "zone_indices": [1]
       },
-      {
-        "type": "outflow+dong",
-	"delta": 0.01,        // default neko value
-	"velocity_scale": 1,  // default neko value
+        {
+        // Outflow with specified pressure distribution
+        "type": "outflow+user",
         "zone_indices": [2]
       },
-      {
-        "type": "normal_outflow",
-        "zone_indices": [3,4]
-      }
-    ]
-  },
+        {
+        "type": "no_slip",
+        "zone_indices": [3]
+      },
+        {
+        "type": "no_slip",
+        "zone_indices": [4]
+      }      ]
+    },
   }
 }
