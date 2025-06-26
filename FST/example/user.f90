@@ -78,6 +78,7 @@ contains
                     host_to_device, sync = .false.)
             call device_memcpy(w%x, w%x_d, w%dof%size(), &
                     host_to_device, sync = .false.)
+
          end if
        end associate
 
