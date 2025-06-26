@@ -24,7 +24,7 @@
       "enabled": false, // !!! FST IS DISABLED !!
       "t_start": 0.00,
       "t_ramp": 0.001,
-      "alpha": 0.05,
+      "alpha": 0.15, // 15% distance to the y boundaries
       "periodic_z": true
     },
 
