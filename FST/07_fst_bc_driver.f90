@@ -33,7 +33,6 @@ module fst_bc_driver
   !! to use `masked_copy` (see later for clarifications).
   integer, allocatable :: STUPID_MASK(:)
 
-  real(kind=rp) :: DT
   ! ============================================================================
 
   public :: fst_bc_driver_initialize, fst_bc_driver_finalize, &
@@ -67,7 +66,6 @@ module fst_bc_driver
        return
     end if
 
-    call json_get(params, "case.timestep", DT)
     call json_get_or_default(params, "case.FST.periodic_x", px, .false.)
     call json_get_or_default(params, "case.FST.periodic_y", py, .false.)
     call json_get_or_default(params, "case.FST.periodic_z", pz, .false.)
