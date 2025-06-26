@@ -67,7 +67,7 @@ module fst_bc_driver
        return
     end if
 
-    call json_get(params, "case.timestep", DT)
+    call json_get(params, "case.time.timestep", DT)
     call json_get_or_default(params, "case.FST.periodic_x", px, .false.)
     call json_get_or_default(params, "case.FST.periodic_y", py, .false.)
     call json_get_or_default(params, "case.FST.periodic_z", pz, .false.)
