@@ -1,0 +1,42 @@
+#!/bin/bash
+
+NEKO_INSTALL_PATH="$NEKO/install_gpu"
+which_gpu="cuda"
+
+echo "Compiling for $which_gpu"
+echo "Compiling with $NEKO_INSTALL_PATH/bin/makeneko"
+
+# First, copy makeneko to a dummy one
+cp "${NEKO_INSTALL_PATH}/bin/makeneko" dummy_makeneko
+
+# Modify makeneko to add HAVE_[CUDA,HIP]
+HAVE_CUDA=$(grep "HAVE_CUDA_BCKND=" dummy_makeneko | cut -d'=' -f2)
+HAVE_HIP=$(grep "HAVE_HIP_BCKND=" dummy_makeneko | cut -d'=' -f2)
+
+# Modify the dummy makeneko and add the relevant variables HAVE_CUDA
+# and HAVE_HIP to the FCFLAGS
+ADD_CUSTOM_DEF="-DHAVE_CUDA=${HAVE_CUDA} -DHAVE_HIP=${HAVE_HIP}"
+FCFLAGS_CURRENT=$(grep "FCFLAGS=" dummy_makeneko | cut -d"'" -f2)
+
+FCFLAGS_NEW="${FCFLAGS_CURRENT} ${ADD_CUSTOM_DEF}"
+echo $FCFLAGS_CURRENT
+echo $FCFLAGS_NEW
+sed -i "s|^FCFLAGS=.*|FCFLAGS='${FCFLAGS_NEW}'|g" dummy_makeneko
+
+# Set the correct files to compile
+backend_path_gpu="bcknd/device"
+backend_path_cpu="bcknd/cpu"
+
+backend_cpu="$backend_path_cpu/opr_cpu.f90"
+backend_device="$backend_path_gpu/$which_gpu/opr_fst.cu"
+backend_interface="$backend_path_gpu/opr_device.F90"
+
+backend="$backend_cpu $backend_device $backend_interface"
+interface="fst_operator.f90"
+fst_core="FST-core/0*"
+driver="drivers/0*"
+
+echo ./dummy_makeneko $backend $interface $fst_core $driver $1
+./dummy_makeneko $backend $interface $fst_core $driver $1
+
+rm dummy_makeneko
