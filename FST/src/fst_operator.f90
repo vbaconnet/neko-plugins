@@ -35,9 +35,9 @@ module fst_operator
   use neko_config, only : NEKO_BCKND_SX, NEKO_BCKND_DEVICE, NEKO_BCKND_XSMM, &
        NEKO_DEVICE_MPI
   use num_types, only : rp, xp
-  use opr_cpu, only :opr_cpu_fst
-  use opr_device, only : opr_device_fst
-  use device, only : device_get_ptr
+  use opr_fst_cpu, only: opr_fst_cpu_fst
+  use opr_fst_device, only: opr_fst_device_fst
+  use device, only: device_get_ptr
   use, intrinsic :: iso_c_binding, only : c_ptr
   implicit none
   private
@@ -82,11 +82,11 @@ contains
        k_x_d = device_get_ptr(wavenumbers_x)
        mask_d = device_get_ptr(mask)
 
-       call opr_device_fst(t, Uinf, u_d,v_d,w_d, mask_d,n_mask, &
+       call opr_fst_device_fst(t, Uinf, u_d,v_d,w_d, mask_d,n_mask, &
             ubf_d, vbf_d, wbf_d, k_x_d, n_total_modes, phi_0_d, shell_d, &
             shell_amp_d, randvec_d, cosa, sina, fringe_time, fs_d)
     else
-       call opr_cpu_fst(t, Uinf, u,v,w, mask,n_mask, &
+       call opr_fst_cpu_fst(t, Uinf, u,v,w, mask,n_mask, &
             u_baseflow, v_baseflow, w_baseflow, &
             wavenumbers_x, n_total_modes, phi_0, shell, shell_amplitudes, &
             random_vectors, cosa, sina, fringe_time, fringe_space)

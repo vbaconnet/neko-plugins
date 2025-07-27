@@ -31,17 +31,17 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Operators CPU backend
-module opr_cpu
+module opr_fst_cpu
   use num_types, only : rp, dp, xp
   implicit none
   private
 
-  public :: opr_cpu_fst
+  public :: opr_fst_cpu_fst
 
 contains
 
   !> Compute FST on CPU
-  subroutine opr_cpu_fst(t, Uinf, u,v,w, mask,n_mask, &
+  subroutine opr_fst_cpu_fst(t, Uinf, u,v,w, mask,n_mask, &
             u_baseflow, v_baseflow, w_baseflow, &
             wavenumbers_x, n_total_modes, phi_0, shell, shell_amplitudes, &
             random_vectors, cosa, sina, fringe_time, fringe_space)
@@ -104,7 +104,6 @@ contains
 
     end do
 
+  end subroutine opr_fst_cpu_fst
 
-  end subroutine opr_cpu_fst
-
-end module opr_cpu
+end module opr_fst_cpu

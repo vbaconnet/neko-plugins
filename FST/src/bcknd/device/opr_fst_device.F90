@@ -31,7 +31,7 @@
 ! POSSIBILITY OF SUCH DAMAGE.
 !
 !> Operators accelerator backends
-module opr_device
+module opr_fst_device
   use num_types, only : rp, c_rp
   use device, only : device_get_ptr
   use utils, only : neko_error
@@ -40,7 +40,7 @@ module opr_device
   implicit none
   private
 
-  public :: opr_device_fst
+  public :: opr_fst_device_fst
 
 #ifdef HAVE_CUDA
   interface
@@ -74,7 +74,7 @@ module opr_device
 
 contains
 
-  subroutine opr_device_fst(t, Uinf,u_d,v_d,w_d, mask_d,n_mask, &
+  subroutine opr_fst_device_fst(t, Uinf,u_d,v_d,w_d, mask_d,n_mask, &
        ubf_d, vbf_d, wbf_d, k_x_d, n_total_modes, phi_0_d, shell_d, &
        shell_amp_d, randvec_d, cosa, sina, fringe_time, fs_d)
     real(kind=rp) :: t, Uinf, cosa, sina, fringe_time
@@ -92,5 +92,6 @@ contains
 #else
     call neko_error('No device backend configured')
 #endif
-  end subroutine opr_device_fst
-end module opr_device
+  end subroutine opr_fst_device_fst
+
+end module opr_fst_device
