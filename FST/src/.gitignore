@@ -1,0 +1,6 @@
+extras
+extras/*
+neko
+*.o
+*.smod
+*.mod
