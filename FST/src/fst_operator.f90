@@ -49,7 +49,7 @@ contains
   subroutine fst_bc_compute(t, Uinf, u, v, w, mask, n_mask, &
        u_baseflow, v_baseflow, w_baseflow, &
        wavenumbers_x, n_total_modes, phi_0, shell, shell_amplitudes, &
-       random_vectors, angleXY, fringe_time, fringe_space)
+       random_vectors, angleXY, fringe_time, fringe_space, on_host)
     real(kind=rp), intent(inout), dimension(:,:,:,:) :: u, v, w
     real(kind=rp), intent(in) :: u_baseflow(:), v_baseflow(:), w_baseflow(:)
     integer, intent(in) :: n_mask, n_total_modes
@@ -58,6 +58,7 @@ contains
          fringe_space
     real(kind=rp), intent(in), dimension(:,:) :: phi_0, random_vectors
     real(kind=rp), intent(in) :: t, Uinf, fringe_time, angleXY
+    logical, intent(in) :: on_host
 
     type(c_ptr) :: fs_d, ubf_d, vbf_d, wbf_d, phi_0_d, randvec_d, shell_d, &
          shell_amp_d, k_x_d, u_d, v_d, w_d, mask_d
@@ -67,7 +68,7 @@ contains
     cosa = cos(angleXY)
     sina = sin(angleXY)
 
-    if (NEKO_BCKND_DEVICE .eq. 1) then
+    if (NEKO_BCKND_DEVICE .eq. 1 .and. .not. on_host) then
        u_d = device_get_ptr(u)
        v_d = device_get_ptr(v)
        w_d = device_get_ptr(w)

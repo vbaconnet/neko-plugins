@@ -1,6 +1,6 @@
 module global_params
   use logger, only: neko_log, LOG_SIZE
-  use num_types, only: rp, dp, rp
+  use num_types, only: rp, dp, rp, xp
 
   implicit none
 

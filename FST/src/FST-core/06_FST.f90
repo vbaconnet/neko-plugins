@@ -524,7 +524,7 @@ contains
   ! Assumes that u,v,w have the same bc masks
   subroutine FST_apply_BC(this, bc_mask, n, &
        x, y, z, t, &
-       u_bc, v_bc, w_bc, angleXY)
+       u_bc, v_bc, w_bc, angleXY, on_host)
 
     class(FST_t), intent(in) :: this
     integer, intent(in) :: n ! size of the bc mask
@@ -533,6 +533,7 @@ contains
     real(kind=rp), intent(in) :: t
     real(kind=rp), intent(inout), dimension(:,:,:,:) :: u_bc, v_bc, w_bc
     real(kind=rp), intent(in) :: angleXY
+    logical, intent(in) :: on_host
 
 !!$    integer :: idx, l, m, i, shellno
 !!$    integer, parameter :: gdim = 3
@@ -548,7 +549,7 @@ contains
     call fst_bc_compute(t, glb_uinf,u_bc, v_bc, w_bc, bc_mask, n, &
        this%u_baseflow, this%v_baseflow, this%w_baseflow, &
        this%k_x, k_length, this%phi_0, shell, shell_amp, &
-       this%random_vectors, angleXY, fringe_time, this%fringe_space)
+       this%random_vectors, angleXY, fringe_time, this%fringe_space, on_host)
 
 !!$    phi_t = glb_uinf*t
 !!$    ! Loop on all points in the point zone
