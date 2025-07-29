@@ -7,10 +7,15 @@
 module FST
 
   use global_params
+  use fst_operator, only: fst_bc_compute
   use turbu
   use utils, only: neko_error
   use point_zone, only: point_zone_t
+  use math, only: masked_gather_copy
+  use device_math, only: device_masked_gather_copy
 
+  use device, only: device_map, device_memcpy, HOST_TO_DEVICE
+  use, intrinsic :: iso_c_binding, only : c_ptr, C_NULL_PTR
   implicit none
 
 
@@ -49,15 +54,28 @@ module FST
 
      !> Fringe in space
      real(kind=rp), allocatable :: fringe_space(:)
+     type(c_ptr) :: fringe_space_d = C_NULL_PTR
 
      !> Baseflows, if applying on a non-uniform inflow
      real(kind=rp), allocatable :: u_baseflow(:)
      real(kind=rp), allocatable :: v_baseflow(:)
      real(kind=rp), allocatable :: w_baseflow(:)
+     type(c_ptr) :: u_baseflow_d = C_NULL_PTR
+     type(c_ptr) :: v_baseflow_d = C_NULL_PTR
+     type(c_ptr) :: w_baseflow_d = C_NULL_PTR
 
      !> Variable that is precomputed to save some time
      real(kind=rp), allocatable :: phi_0(:,:)
+     type(c_ptr) :: phi_0_d = C_NULL_PTR
 
+     real(kind=rp), allocatable :: random_vectors(:,:) ! u_hat_pn but reshaped
+     type(c_ptr) :: random_vectors_d = C_NULL_PTR
+     type(c_ptr) :: u_hat_pn_d = C_NULL_PTR
+     type(c_ptr) :: shell_d = C_NULL_PTR
+     type(c_ptr) :: shell_amp_d = C_NULL_PTR
+
+     real(kind=rp), allocatable :: k_x(:)
+     type(c_ptr) :: k_x_d = C_NULL_PTR
    contains
 
      ! ======== Init/Free procedures
@@ -239,9 +257,10 @@ contains
   subroutine FST_apply_baseflow(this, mask, n, u, v, w)
     class(FST_t), intent(inout) :: this
     type(field_t), intent(in) :: u, v, w
-    integer, intent(in) :: mask(n)
+    integer, intent(in) :: mask(0:n)
     integer, intent(in) :: n
 
+    type(c_ptr) :: mask_d
     integer :: i, idx
 
     if (allocated(this%u_baseflow)) deallocate(this%u_baseflow)
@@ -252,13 +271,22 @@ contains
     allocate(this%v_baseflow(n))
     allocate(this%w_baseflow(n))
 
-    do i = 1, n
-       idx = mask(i)
-       this%u_baseflow(i) = u%x(idx,1,1,1)
-       this%v_baseflow(i) = v%x(idx,1,1,1)
-       this%w_baseflow(i) = w%x(idx,1,1,1)
-    end do
+    if (neko_bcknd_device .eq. 1) then
+       call device_map(this%u_baseflow, this%u_baseflow_d, n)
+       call device_map(this%v_baseflow, this%v_baseflow_d, n)
+       call device_map(this%w_baseflow, this%w_baseflow_d, n)
 
+       mask_d = device_get_ptr(mask)
+
+       call device_masked_gather_copy(this%u_baseflow_d, u%x_d, mask_d, u%dof%size(), n)
+       call device_masked_gather_copy(this%v_baseflow_d, v%x_d, mask_d, u%dof%size(), n)
+       call device_masked_gather_copy(this%w_baseflow_d, w%x_d, mask_d, u%dof%size(), n)
+    else
+       call masked_gather_copy(this%u_baseflow, u%x, mask, u%dof%size(), n)
+       call masked_gather_copy(this%v_baseflow, v%x, mask, u%dof%size(), n)
+       call masked_gather_copy(this%w_baseflow, w%x, mask, u%dof%size(), n)
+    end if
+         
   end subroutine FST_apply_baseflow
 
   !> Common function for generation
@@ -347,7 +375,7 @@ contains
     !
     ! Apply baseflow in the bc zone
     !
-    call this%apply_baseflow(bc_mask(1:n), bc_mask(0), u, v, w)
+    call this%apply_baseflow(bc_mask, bc_mask(0), u, v, w)
 
     !
     ! Initialize the fringe in space
@@ -382,6 +410,53 @@ contains
         this%phi_0(m,j) = k_num_all(m,1)*x + k_num_all(m,2)*y + k_num_all(m,3)*z + bb(m,1) ! bb is phase_shift
       end do  
     end do
+
+    !
+    ! Copy the wavenumbers in x direction
+    !
+    allocate(this%k_x(fst_modes))
+
+    do m = 1, fst_modes
+       this%k_x(m) = k_num_all(m,1)
+    end do
+
+    !
+    ! Copy a proper version of u_hat_pn with correct size
+    !
+    allocate(this%random_vectors(k_length, 3))
+
+    do m = 1, k_length
+       do j =  1, 3
+          this%random_vectors(m,j) = u_hat_pn(m,j)
+       end do
+    end do
+
+    ! Copy everything to device and map with relevant device array pointers
+    if (NEKO_BCKND_DEVICE .eq. 1) then
+       call device_map(this%fringe_space, this%fringe_space_d, bc_mask(0))
+       call device_memcpy(this%fringe_space, this%fringe_space_d, bc_mask(0), &
+            HOST_TO_DEVICE, .false.)
+
+       call device_map(this%phi_0, this%phi_0_d, k_length*bc_mask(0))
+       call device_memcpy(this%phi_0, this%phi_0_d, k_length*bc_mask(0), &
+            HOST_TO_DEVICE, .false.)
+
+       call device_map(this%random_vectors, this%random_vectors_d, k_length*3)
+       call device_memcpy(this%random_vectors, this%random_vectors_d, k_length*3, &
+            HOST_TO_DEVICE, .false.)
+
+       call device_map(shell, this%shell_d, fst_modes)
+       call device_memcpy(shell, this%shell_d, fst_modes, &
+            HOST_TO_DEVICE, .false.)
+
+       call device_map(shell_amp, this%shell_amp_d, nshells)
+       call device_memcpy(shell_amp, this%shell_amp_d, nshells, &
+            HOST_TO_DEVICE, .false.)
+
+       call device_map(this%k_x, this%k_x_d, fst_modes)
+       call device_memcpy(this%k_x, this%k_x_d, fst_modes, &
+            HOST_TO_DEVICE, .true.)
+    end if
 
   end subroutine FST_generate_bc
 
@@ -449,7 +524,7 @@ contains
   ! Assumes that u,v,w have the same bc masks
   subroutine FST_apply_BC(this, bc_mask, n, &
        x, y, z, t, &
-       u_bc, v_bc, w_bc, angleXY)
+       u_bc, v_bc, w_bc, angleXY, on_host)
 
     class(FST_t), intent(in) :: this
     integer, intent(in) :: n ! size of the bc mask
@@ -458,63 +533,71 @@ contains
     real(kind=rp), intent(in) :: t
     real(kind=rp), intent(inout), dimension(:,:,:,:) :: u_bc, v_bc, w_bc
     real(kind=rp), intent(in) :: angleXY
+    logical, intent(in) :: on_host
 
-    integer :: idx, l, m, i, shellno
-    integer, parameter :: gdim = 3
-    real(kind=xp) :: phase_shft, phi, amp, pert, urand, vrand, wrand
-    real(kind=xp) :: rand_vec(gdim), fringe_time, vel_mag, cosa, sina, phi_t
+!!$    integer :: idx, l, m, i, shellno
+!!$    integer, parameter :: gdim = 3
+!!$    real(kind=rp) :: phase_shft, phi, amp, pert, urand, vrand, wrand
+!!$    real(kind=rp) :: rand_vec(gdim), vel_mag, phi_t
+
+    real(kind=rp) :: fringe_time, cosa, sina
 
     fringe_time = time_ramp(t, this%t_end, this%t_start)
     cosa = cos(angleXY)
     sina = sin(angleXY)
-    phi_t = glb_uinf*t
 
-    ! Loop on all points in the point zone
-    do idx = 1, bc_mask(0)
+    call fst_bc_compute(t, glb_uinf,u_bc, v_bc, w_bc, bc_mask, n, &
+       this%u_baseflow, this%v_baseflow, this%w_baseflow, &
+       this%k_x, k_length, this%phi_0, shell, shell_amp, &
+       this%random_vectors, angleXY, fringe_time, this%fringe_space, on_host)
 
-       i = bc_mask(idx)
-
-       !> This vector will contain the sum of all Fourier modes
-       rand_vec = 0.0_rp
-       
-       ! Sum all sin modes for each gll point
-       do m = 1, k_length
-
-          ! Random phase shifts
-          !phase_shft = bb(m,1)
-
-          ! kx(x - U*t) + ky*y + kz*z + phi
-          ! = kx*x + ky*y + kz*z - kx*U*t + phi
-          !phi = k_num_all(m,1) * (x(i,1,1,1) - glb_uinf*t) + &
-          !     k_num_all(m,2) *  y(i,1,1,1) + &
-          !     k_num_all(m,3) *  z(i,1,1,1) + &
-          !     phase_shft
-          
-          phi = this%phi_0(m,idx) - k_num_all(m,1)*phi_t
-
-          shellno = shell(m)
-
-          pert = shell_amp(shellno)*sin(phi)
-
-          rand_vec(1) = rand_vec(1) + u_hat_pn(m,1)*pert
-          rand_vec(2) = rand_vec(2) + u_hat_pn(m,2)*pert
-          rand_vec(3) = rand_vec(3) + u_hat_pn(m,3)*pert
-
-       enddo
-
-       ! Project the rand_vec if there is a rotation
-       urand = rand_vec(1)*cosa - rand_vec(2)*sina
-       vrand = rand_vec(1)*sina + rand_vec(2)*cosa
-       wrand = rand_vec(3)
-
-       u_bc(i,1,1,1) = this%u_baseflow(idx) + &
-            fringe_time*this%fringe_space(idx)*urand
-       v_bc(i,1,1,1) = this%v_baseflow(idx) + &
-            fringe_time*this%fringe_space(idx)*vrand
-       w_bc(i,1,1,1) = this%w_baseflow(idx) + &
-            fringe_time*this%fringe_space(idx)*wrand
-
-    end do
+!!$    phi_t = glb_uinf*t
+!!$    ! Loop on all points in the point zone
+!!$    do idx = 1, bc_mask(0)
+!!$
+!!$       i = bc_mask(idx)
+!!$
+!!$       !> This vector will contain the sum of all Fourier modes
+!!$       rand_vec = 0.0_rp
+!!$
+!!$       ! Sum all sin modes for each gll point
+!!$       do m = 1, k_length
+!!$
+!!$          ! Random phase shifts
+!!$          !phase_shft = bb(m,1)
+!!$
+!!$          ! kx(x - U*t) + ky*y + kz*z + phi
+!!$          ! = kx*x + ky*y + kz*z - kx*U*t + phi
+!!$          !phi = k_num_all(m,1) * (x(i,1,1,1) - glb_uinf*t) + &
+!!$          !     k_num_all(m,2) *  y(i,1,1,1) + &
+!!$          !     k_num_all(m,3) *  z(i,1,1,1) + &
+!!$          !     phase_shft
+!!$
+!!$          phi = this%phi_0(m,idx) - this%k_x(m)*phi_t
+!!$
+!!$          shellno = shell(m)
+!!$
+!!$          pert = shell_amp(shellno)*sin(phi)
+!!$
+!!$          rand_vec(1) = rand_vec(1) + u_hat_pn(m,1)*pert
+!!$          rand_vec(2) = rand_vec(2) + u_hat_pn(m,2)*pert
+!!$          rand_vec(3) = rand_vec(3) + u_hat_pn(m,3)*pert
+!!$
+!!$       enddo
+!!$
+!!$       ! Project the rand_vec if there is a rotation
+!!$       urand = rand_vec(1)*cosa - rand_vec(2)*sina
+!!$       vrand = rand_vec(1)*sina + rand_vec(2)*cosa
+!!$       wrand = rand_vec(3)
+!!$
+!!$       u_bc(i,1,1,1) = this%u_baseflow(idx) + &
+!!$            fringe_time*this%fringe_space(idx)*urand
+!!$       v_bc(i,1,1,1) = this%v_baseflow(idx) + &
+!!$            fringe_time*this%fringe_space(idx)*vrand
+!!$       w_bc(i,1,1,1) = this%w_baseflow(idx) + &
+!!$            fringe_time*this%fringe_space(idx)*wrand
+!!$
+!!$    end do
 
   end subroutine FST_apply_BC
 
@@ -531,7 +614,7 @@ contains
   !   else if (x.ge.f%xend) then
   !      S=1
   !   else
-  !      S=1/(1+exp(1/(x-f%xend)+1/(x-f%xstart)))
+  !      S=1/(1+erp(1/(x-f%xend)+1/(x-f%xstart)))
   !   endif
 
   !   y = f%fringe_max * (S*(x-f%xstart)/(f%delta_rise)-S*((x-f%xend)/f%delta_fall+1))
@@ -561,7 +644,7 @@ contains
   ! Fringe function as described in Schlatter (2001), extended to take y bounds into account too
   !
   !   Here is what the fringe looks like, except the ramp-up is not linear
-  !   but exponential (see function S below)
+  !   but erponential (see function S below)
   !
   ! fringe_max      ________
   !                /        \
@@ -590,7 +673,7 @@ contains
 
   end function fringe
 
-  ! Smooth step function, 0 if x <= 0, 1 if x >= 1, 1/exp(1/(x-1) + 1/x) between 0 and 1
+  ! Smooth step function, 0 if x <= 0, 1 if x >= 1, 1/erp(1/(x-1) + 1/x) between 0 and 1
   function S(x) result(y)
     real(kind=rp), intent(in) :: x
     real(kind=rp)             :: y

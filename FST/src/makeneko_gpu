@@ -1,0 +1,79 @@
+#!/bin/bash
+
+usage() {
+
+  echo "Usage"
+  echo "./makeneko_gpu <user file> <path to neko install> <hip or cuda> <path to src folder>"
+  echo ""
+  echo "Example"
+  echo "./makeneko_gpu swept-wing.f90 /cfs/klemming/scratch/y/ycl/Neko/neko hip ./src"
+
+}
+
+NEKO_INSTALL_PATH=${2}
+which_gpu=${3}
+src_path=${4}
+
+# Check if exactly 4 arguments are given
+if [ "$#" -ne 4 ]; then
+  echo "Error: Exactly 4 arguments are required."
+  usage
+  exit
+fi
+
+# Check if $3 is 'cuda' or 'hip'
+if [ "$3" != "cuda" ] && [ "$3" != "hip" ]; then
+  echo "Error: Argument 3 must be 'cuda' or 'hip'."
+  usage
+fi
+
+echo "[INFO] Neko install path: $NEKO_INSTALL_PATH"
+echo "[INFO] GPU backend      : $which_gpu"
+echo "[INFO] User source path : $src_path"
+echo
+
+# First, copy makeneko to a dummy one
+cp "${NEKO_INSTALL_PATH}/bin/makeneko" dummy_makeneko
+
+# Add relevant flag depending on CUDA or HIP
+if [ "${which_gpu}" == "cuda" ]; then
+   HAVE_CUDA=$(grep "HAVE_CUDA_BCKND=" dummy_makeneko | cut -d'=' -f2)
+   ADD_CUSTOM_DEF="-DHAVE_CUDA=${HAVE_CUDA}"
+else
+   HAVE_HIP=$(grep "HAVE_HIP_BCKND=" dummy_makeneko | cut -d'=' -f2)
+   ADD_CUSTOM_DEF="-DHAVE_HIP=${HAVE_HIP}"
+fi
+
+# Modify the dummy makeneko and add the relevant variables HAVE_CUDA
+# and HAVE_HIP to the FCFLAGS
+FCFLAGS_CURRENT=$(grep "FCFLAGS=" dummy_makeneko | cut -d"'" -f2)
+FCFLAGS_NEW="${FCFLAGS_CURRENT} ${ADD_CUSTOM_DEF}"
+
+sed -i "s|^FCFLAGS=.*|FCFLAGS='${FCFLAGS_NEW}'|g" dummy_makeneko
+
+# Set the correct files to compile
+backend_path_gpu="${src_path}/bcknd/device"
+backend_path_cpu="${src_path}/bcknd/cpu"
+
+backend_cpu="$backend_path_cpu/opr_fst_cpu.f90"
+
+if [ "${which_gpu}" == "cuda" ]; then
+   backend_device="$backend_path_gpu/cuda/opr_fst.cu"
+else
+   backend_device="$backend_path_gpu/hip/opr_fst.hip"
+fi
+
+backend_interface="$backend_path_gpu/opr_fst_device.F90"
+
+backend="$backend_device $backend_cpu $backend_interface"
+interface="${src_path}/fst_operator.f90"
+fst_core="${src_path}/FST-core/0*"
+driver="${src_path}/drivers/0*"
+
+# Put here any extra files to compile
+extras="${src_path}/extras/0*"
+
+echo ./dummy_makeneko $backend $interface $fst_core $driver $extras $1
+./dummy_makeneko $backend $interface $fst_core $driver $extras $1
+
+rm dummy_makeneko

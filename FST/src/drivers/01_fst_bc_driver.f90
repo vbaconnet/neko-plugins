@@ -132,7 +132,7 @@ module fst_bc_driver
 
   end subroutine fst_bc_driver_initialize
 
-  subroutine fst_bc_driver_apply(u, v, w, bc, coef, t, tstep, angle, memcpy)
+  subroutine fst_bc_driver_apply(u, v, w, bc, coef, t, tstep, angle, on_cpu)
     type(field_t), intent(inout) :: u
     type(field_t), intent(inout) :: v
     type(field_t), intent(inout) :: w
@@ -141,7 +141,7 @@ module fst_bc_driver
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
     real(kind=rp), intent(in) :: angle
-    logical, intent(in), optional :: memcpy
+    logical, intent(in), optional :: on_cpu
 
     integer :: i, idx
 
@@ -157,21 +157,10 @@ module fst_bc_driver
 
     ! Then, apply the free stream turbulence that will add on
     ! top of the existing baseflow.
-    ! NOTE: it does not copy to the GPU
+    ! NOTE: if on_cpu is true, memory is not copied to the GPU (you need
+    ! to do it yourself)
     call FST_obj%apply_BC(bc%msk, bc%msk(0), &
-         u%dof%x, u%dof%y, u%dof%z, t, u%x, v%x, w%x, angle)
-
-    ! if not copy to memory, return here
-    if (.not. memcpy) return
-
-    if (neko_bcknd_device .eq. 1) then
-       call device_memcpy(u%x, u%x_d, u%dof%size(), &
-               host_to_device, sync = .false.)
-       call device_memcpy(v%x, v%x_d, v%dof%size(), &
-               host_to_device, sync = .false.)
-       call device_memcpy(w%x, w%x_d, w%dof%size(), &
-               host_to_device, sync = .true.)
-    end if
+         u%dof%x, u%dof%y, u%dof%z, t, u%x, v%x, w%x, angle, on_cpu)
 
   end subroutine fst_bc_driver_apply
 

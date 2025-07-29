@@ -1,12 +1,12 @@
 module global_params
   use logger, only: neko_log, LOG_SIZE
-  use num_types, only: rp, dp
+  use num_types, only: rp, dp, rp, xp
 
   implicit none
 
-  real(kind=rp) :: glb_uinf = 1.0_rp
+  real(kind=rp) :: glb_uinf = 6.0_rp
   real(kind=rp) :: fst_ti = 3.7d-2 ! turbulence intensity
-  real(kind=rp) :: fst_il = 11.53d-3 ! integral length scale		
+  real(kind=rp) :: fst_il = 11.53d-3 ! integral length scale
 
   integer, parameter :: nshells = 80! No of spherical shells
   integer, parameter :: Npmax = 40  ! Npmax  -  Number of points in a shell

@@ -1,0 +1,9 @@
+#!/bin/bash
+
+backend="bcknd/cpu/*"
+interface="fst_operator.f90"
+fst_core="FST-core/0*"
+driver="drivers/0*"
+
+echo $NEKO/install_cpu/bin/makeneko $backend $interface $fst_core $driver $1
+$NEKO/install_cpu/bin/makeneko $backend $interface $fst_core $driver $1
