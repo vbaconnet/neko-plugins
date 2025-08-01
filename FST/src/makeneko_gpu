@@ -73,7 +73,7 @@ driver="${src_path}/drivers/0*"
 # Put here any extra files to compile
 extras="${src_path}/extras/0*"
 
-echo ./dummy_makeneko $backend $interface $fst_core $driver $extras $1
+echo $NEKO_INSTALL_PATH/bin/makeneko $backend $interface $fst_core $driver $extras $1
 ./dummy_makeneko $backend $interface $fst_core $driver $extras $1
 
 rm dummy_makeneko
