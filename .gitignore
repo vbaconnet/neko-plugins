@@ -3,3 +3,10 @@
 *.smod
 example
 example/*
+*.f0*
+*.nek5000
+bb.txt
+bb.csv
+fst_spectrum.csv
+fst_spectrum.dat
+
