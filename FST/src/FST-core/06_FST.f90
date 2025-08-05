@@ -6,14 +6,17 @@
 
 module FST
 
-  use global_params
+  !use global_params
   use fst_operator, only: fst_bc_compute
-  use turbu
+  !use turbu
   use utils, only: neko_error
+  use field, only: field_t
+  use coef, only: coef_t
+  use logger, ony: neko_log, LOG_SIZE
   use point_zone, only: point_zone_t
   use math, only: masked_gather_copy
   use device_math, only: device_masked_gather_copy
-
+  use num_types, only: rp, xp
   use device, only: device_map, device_memcpy, HOST_TO_DEVICE
   use, intrinsic :: iso_c_binding, only : c_ptr, C_NULL_PTR
   implicit none
@@ -70,17 +73,23 @@ module FST
 
      real(kind=rp), allocatable :: random_vectors(:,:) ! u_hat_pn but reshaped
      type(c_ptr) :: random_vectors_d = C_NULL_PTR
-     type(c_ptr) :: u_hat_pn_d = C_NULL_PTR
+     integer, allocatable :: shell(:)
      type(c_ptr) :: shell_d = C_NULL_PTR
+     real(kind=rp), allocatable :: shell_amp(:)
      type(c_ptr) :: shell_amp_d = C_NULL_PTR
 
+     real(kind=rp), allocatable :: k_y(:)
+     real(kind=rp), allocatable :: k_z(:)
      real(kind=rp), allocatable :: k_x(:)
      type(c_ptr) :: k_x_d = C_NULL_PTR
+     real(kind=rp), allocatable :: phase_shifts(:)
+
    contains
 
      ! ======== Init/Free procedures
      procedure, pass(this) :: init_common => FST_init_common
      procedure, pass(this) :: init_bc => FST_init_bc
+     procedure, pass(this) :: init_from_files => FSF_init_from_files
      procedure, pass(this) :: init_forcing => FST_init_forcing
      procedure, pass(this) :: free => FST_free_params
      ! =========================================================================
@@ -143,7 +152,79 @@ contains
     this%t_end = t_end
     this%t_start = t_start
 
+
+
   end subroutine FST_init_common
+
+  subroutine FST_init_from_files(this, Uinf, Tu, Il)
+    class(FST_t), intent(inout) :: this
+    real(kind=rp), intent(in) :: Uinf, Tu, Il
+
+    integer :: unit, ios, num_columns, num_lines, n_modes_total
+    character(len=1) :: delimiter
+    delimiter = ','
+
+    ! 1. Read FST spectrum
+    open(file="fst_spectrum.csv", unit=unit, status="old", action="read", iostat=ios)
+    if (ios /= 0) then
+       call neko_error("Error opening fst_spectrum.csv")
+    end if
+
+    num_columns = 1
+    num_lines = 0
+
+    ! Read the file line by line
+    do
+       read(unit, '(A)', iostat=ios) line
+       if (ios /= 0) exit
+
+       ! If it's the first line, count the columns
+       if (num_columns .eq. 1) then
+
+          ! Count the number of delimiters in the line
+          do i = 1, len_trim(line)
+             if (line(i:i) == delimiter) then
+                num_columns = num_columns + 1
+             end if
+          end do
+
+       end if ! if num_columns .eq. 1
+
+       num_lines = num_lines + 1
+    end do
+    close(unit)
+
+    if (num_columns .ne. 8) call neko_error("fst_spectrum.csv should have 8 columns")
+    n_modes_total = num_lines - 1 ! Remove the header
+    print *, "N MODES", n_modes_total
+
+    !
+    ! Allocate all the relevant arrays:
+    ! shell,  kx, ky, kz, amplitudes, u_hat_pn, v_hat_pn, w_hat_pn
+    allocate(this%shell(n_modes_total))
+    allocate(this%kx(n_modes_total))
+    allocate(this%ky(n_modes_total))
+    allocate(this%kz(n_modes_total))
+    allocate(this%shell_amp(n_modes_total))
+    allocate(this%random_vectors(n_modes_total,3))
+
+    ! Now read through the file again and fill the arrays
+    open(file="fst_spectrum.csv", unit=unit, status="old", action="read", iostat=ios)
+    if (ios /= 0) then
+       call neko_error("Error opening fst_spectrum.csv")
+    end if
+
+    ! Read the file line by line
+    do i = 1, num_lines
+       read(unit, '(7(g0,","),g0)', iostat=ios) this%shell(i), this%kx(i), &
+            this%ky(i), this%kz(i), this%shell_amp(i), this%random_vectors(i,1), &
+            this%random_vectors(i,2), this%random_vectors(i,3)
+    end do
+    close(unit)
+
+
+
+  end subroutine FST_init_from_files
 
 
   !> Initialize the FST to use with forcing.
@@ -221,6 +302,12 @@ contains
     class(FST_t), intent(inout) :: this
 
     if(allocated(this%fringe_space)) deallocate(this%fringe_space)
+    if(allocated(this%phi_0)) deallocate(this%phi_0)
+    if(allocated(this%kx)) deallocate(this%kx)
+    if(allocated(this%ky)) deallocate(this%ky)
+    if(allocated(this%kz)) deallocate(this%kz)
+    if(allocated(this%shell)) deallocate(this%shell)
+    if(allocated(this%shell_amp)) deallocate(this%shell_amp)
     if(allocated(this%phi_0)) deallocate(this%phi_0)
 
     if (allocated(this%u_baseflow)) deallocate(this%u_baseflow)
@@ -370,7 +457,7 @@ contains
     integer :: ierr, i, idx, m, j
 
     ! Do the general generation
-    call this%generate_common(coef)
+    !call this%generate_common(coef)
 
     !
     ! Apply baseflow in the bc zone
@@ -407,7 +494,8 @@ contains
       y = coef%dof%y(bc_mask(j), 1,1,1)
       z = coef%dof%z(bc_mask(j), 1,1,1)
       do m = 1, k_length
-        this%phi_0(m,j) = k_num_all(m,1)*x + k_num_all(m,2)*y + k_num_all(m,3)*z + bb(m,1) ! bb is phase_shift
+        !this%phi_0(m,j) = k_num_all(m,1)*x + k_num_all(m,2)*y + k_num_all(m,3)*z + bb(m,1) ! bb is phase_shift
+        this%phi_0(m,j) = this%kx(m)*x + this%ky(m)*y + this%kz(m)*z + this%phase_shifts(m) ! bb is phase_shift
       end do  
     end do
 

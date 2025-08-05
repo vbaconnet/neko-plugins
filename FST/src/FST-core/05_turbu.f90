@@ -86,8 +86,8 @@ contains
       we=0.
       !           Also write the modes
       if (write_files) open(file='fst_spectrum.csv',unit=13)
-      if (write_files) write(13,'(9(A, ","),A)') 'ShellNo','kx','ky','kz', &
-            'u_amp','v_amp','w_amp','u_hat_pn1','u_hat_pn2', 'u_hat_pn3'
+      if (write_files) write(13,'(7(A, ","),A)') 'ShellNo','kx','ky','kz', &
+            'amp','u_hat_pn1','u_hat_pn2', 'u_hat_pn3'
       do i=1,k_length
         shellno = shell(i)
         amp = shell_amp(shellno)
@@ -98,8 +98,8 @@ contains
         vamp = u_hat_pn(i,2)*amp
         wamp = u_hat_pn(i,3)*amp
         
-        if (write_files) write(13,'(9(g0, ","), g0)') shellno,k_num_all(i,1),k_num_all(i,2), &
-        k_num_all(i,3),uamp,vamp,wamp, u_hat_pn(i,1), u_hat_pn(i,2), u_hat_pn(i,3)
+        if (write_files) write(13,'(7(g0, ","), g0)') shellno,k_num_all(i,1),k_num_all(i,2), &
+        k_num_all(i,3),amp, u_hat_pn(i,1), u_hat_pn(i,2), u_hat_pn(i,3)
 
         ue =  ue + ((uamp)**2)/2.
         ve =  ve + ((vamp)**2)/2.
