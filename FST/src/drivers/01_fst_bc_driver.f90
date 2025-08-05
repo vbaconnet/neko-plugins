@@ -56,8 +56,9 @@ module fst_bc_driver
     character(len=:), allocatable :: read_str, fname
     logical :: px, py, pz
     real(kind=xp) :: x, ymin, ymax, zmin, zmax, delta_y, delta_z, Ly, Lz
+    real(kind=xp) :: ystart, yend, zstart, zend
     integer :: i, idx, ierr, n
-    real(kind=rp) :: alpha, t_ramp, t_start, amp
+    real(kind=xp) :: alpha, beta, t_ramp, t_start, amp
 
     call json_get_or_default(params, "case.FST.enabled", ENABLED, .true.)
 
@@ -100,7 +101,6 @@ module fst_bc_driver
     ! Read parameters for the FST fringe in space
     call json_get(params, "case.FST.alpha", alpha)
 
-
     ! In the periodic direction(s) there should not be any fringe. To do this
     ! I artificially set huge min/max values so that the boundary we are applying
     ! on is always in the region where the fringe is = 1
@@ -108,8 +108,14 @@ module fst_bc_driver
        ymin = ymin - 999.0_rp*Ly
        ymax = ymax + 999.0_rp*Ly
        Ly = ymax - ymin
-       delta_y = 0.01_xp*Ly
+
+       ! Below values are garbage just to initialize the values
+       delta_y = 0.0001_rp*Ly
+       ystart  = ymin + delta_y
+       yend    = ymax - delta_y 
     else
+       call json_get(params, "case.FST.ystart", ystart)
+       call json_get(params, "case.FST.yend", yend)
        delta_y = alpha*Ly
     end if
 
@@ -117,8 +123,12 @@ module fst_bc_driver
        zmin = zmin - 999.0_rp*Lz
        zmax = zmax + 999.0_rp*Lz
        Lz = zmax - zmin
-       delta_z = 0.01_xp*Lz
+       delta_z = 0.0001_rp*Lz
+       zstart  = zmin + delta_z
+       zend    = zmax - delta_z 
     else
+       call json_get(params, "case.FST.zstart", zstart)
+       call json_get(params, "case.FST.zend", zend)
        delta_z = alpha * Lz
     end if
     
@@ -127,8 +137,12 @@ module fst_bc_driver
     call json_get_or_default(params, "case.FST.t_start", t_start, 0.0_rp)
 
     ! Initialize the fst parameters
-    call FST_OBJ%init_bc(zmin, zmax, delta_z, delta_z, ymin, ymax, delta_y, &
-         delta_y, t_start, t_ramp, px, py, pz)
+    call FST_OBJ%init_bc(zmin, zmax, zstart, zend, &
+            delta_z, delta_z, &
+            ymin, ymax, ystart, yend, &
+            delta_y, delta_y, &
+            t_start, t_ramp, &
+            px, py, pz)
 
   end subroutine fst_bc_driver_initialize
 
