@@ -132,7 +132,8 @@ module fst_bc_driver
 
   end subroutine fst_bc_driver_initialize
 
-  subroutine fst_bc_driver_apply(u, v, w, bc, coef, t, tstep, angle, on_cpu)
+  subroutine fst_bc_driver_apply(u, v, w, bc, coef, t, tstep, angle, on_cpu, &
+       regen)
     type(field_t), intent(inout) :: u
     type(field_t), intent(inout) :: v
     type(field_t), intent(inout) :: w
@@ -141,7 +142,7 @@ module fst_bc_driver
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
     real(kind=rp), intent(in) :: angle
-    logical, intent(in), optional :: on_cpu
+    logical, intent(in) :: on_cpu, regen
 
     integer :: i, idx
 
@@ -152,7 +153,7 @@ module fst_bc_driver
     ! on the boundry mask!
     !
     if (tstep .eq. 1) then
-       call FST_obj%generate_bc(coef, bc%msk, bc%msk(0), u=u, v=v, w=w)
+       call FST_obj%generate_bc(coef, bc%msk, bc%msk(0), u, v, w, regen)
     end if
 
     ! Then, apply the free stream turbulence that will add on

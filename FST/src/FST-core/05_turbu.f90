@@ -22,6 +22,13 @@ contains
     real(kind=rp) :: u_hat(fst_modes, 3), u_hat_p(fst_modes, 3)
     character(len=LOG_SIZE) :: log_buf
 
+    call print_param("nshells", real(nshells, kind=rp))
+    call print_param("Npmax", real(Npmax, kind=rp))
+    call print_param("fst_ti", fst_ti)
+    call print_param("fst_il", fst_il)
+    call print_param("kstart", kstart)
+    call print_param("kend", kend)
+
     dlx = glmax(coef%dof%x, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv) - &
           glmin(coef%dof%x, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv)
 
