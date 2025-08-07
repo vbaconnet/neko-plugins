@@ -73,7 +73,7 @@ contains
          !
          ! Apply FST
          !
-         call fst_bc_driver_apply(u, v, w, bc, coef, t, tstep, 0.0_rp, .false.)
+         call fst_bc_driver_apply(u, v, w, bc, coef, t, tstep, 0.0_rp, .false., .true.)
 
        end associate
 
