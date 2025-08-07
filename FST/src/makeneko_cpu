@@ -1,6 +1,6 @@
 #!/bin/bash
 
-backend="bcknd/cpu/*"
+backend="bcknd/cpu/opr_fst_cpu.f90 bcknd/device/opr_fst_device.F90"
 interface="fst_operator.f90"
 fst_core="FST-core/0*"
 driver="drivers/0*"
