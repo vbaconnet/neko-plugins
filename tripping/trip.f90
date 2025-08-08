@@ -329,7 +329,7 @@ contains
     
     if (this%mask(0) .gt. 0) &
        call device_inhom_dirichlet_apply_vector(this%mask_d,fx_d,fy_d,fz_d,&
-            this%ftripx_d,this%ftripy_d,this%ftripz_d,this%mask(0))
+            this%ftripx_d,this%ftripy_d,this%ftripz_d,this%mask(0), glb_cmd_queue)
 	
 
     ! do il= 1, this%nline

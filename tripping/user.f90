@@ -37,13 +37,11 @@ contains
   ! Register user defined functions (see user_intf.f90)
   subroutine user_setup(u)
     type(user_t), intent(inout) :: u
-    u%user_dirichlet_update => set_boundary_conditions
     u%fluid_user_f_vector => userf
     u%fluid_user_f => tripline_org
     u%user_init_modules => initialize
     u%user_finalize_modules => finalize
     u%user_check => usercheck
-    u%fluid_user_ic => user_ic
   end subroutine user_setup
 
   ! Finalize user variables or external objects
