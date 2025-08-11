@@ -35,27 +35,27 @@ module FST
      logical :: periodic_z
 
      ! x fringe
-     real(kind=rp) :: xmin
-     real(kind=rp) :: xmax
-     real(kind=rp) :: xstart 
-     real(kind=rp) :: xend
-     real(kind=rp) :: x_delta_rise
-     real(kind=rp) :: x_delta_fall
+     real(kind=xp) :: xmin
+     real(kind=xp) :: xmax
+     real(kind=xp) :: xstart 
+     real(kind=xp) :: xend
+     real(kind=xp) :: x_delta_rise
+     real(kind=xp) :: x_delta_fall
 
      ! y fringe
-     real(kind=rp) :: ymin
-     real(kind=rp) :: ymax
-     real(kind=rp) :: ystart
-     real(kind=rp) :: yend
-     real(kind=rp) :: y_delta_rise
-     real(kind=rp) :: y_delta_fall
+     real(kind=xp) :: ymin
+     real(kind=xp) :: ymax
+     real(kind=xp) :: ystart
+     real(kind=xp) :: yend
+     real(kind=xp) :: y_delta_rise
+     real(kind=xp) :: y_delta_fall
 
      !> Total fringe amplitude
-     real(kind=rp) :: fringe_max
+     real(kind=xp) :: fringe_max
 
      !> Final ramp time
-     real(kind=rp) :: t_end
-     real(kind=rp) :: t_start
+     real(kind=xp) :: t_end
+     real(kind=xp) :: t_start
 
      logical :: is_forcing
      logical :: is_bc
@@ -64,33 +64,33 @@ module FST
      integer :: n_modes_total ! = k_length
 
      !> Fringe in space
-     real(kind=rp), allocatable :: fringe_space(:)
+     real(kind=xp), allocatable :: fringe_space(:)
      type(c_ptr) :: fringe_space_d = C_NULL_PTR
 
      !> Baseflows, if applying on a non-uniform inflow
-     real(kind=rp), allocatable :: u_baseflow(:)
-     real(kind=rp), allocatable :: v_baseflow(:)
-     real(kind=rp), allocatable :: w_baseflow(:)
+     real(kind=xp), allocatable :: u_baseflow(:)
+     real(kind=xp), allocatable :: v_baseflow(:)
+     real(kind=xp), allocatable :: w_baseflow(:)
      type(c_ptr) :: u_baseflow_d = C_NULL_PTR
      type(c_ptr) :: v_baseflow_d = C_NULL_PTR
      type(c_ptr) :: w_baseflow_d = C_NULL_PTR
 
      !> Variable that is precomputed to save some time
-     real(kind=rp), allocatable :: phi_0(:,:)
+     real(kind=xp), allocatable :: phi_0(:,:)
      type(c_ptr) :: phi_0_d = C_NULL_PTR
 
-     real(kind=rp), allocatable :: random_vectors(:,:) ! u_hat_pn but reshaped
+     real(kind=xp), allocatable :: random_vectors(:,:) ! u_hat_pn but reshaped
      type(c_ptr) :: random_vectors_d = C_NULL_PTR
      integer, allocatable :: shell(:)
      type(c_ptr) :: shell_d = C_NULL_PTR
-     real(kind=rp), allocatable :: shell_amp(:)
+     real(kind=xp), allocatable :: shell_amp(:)
      type(c_ptr) :: shell_amp_d = C_NULL_PTR
 
-     real(kind=rp), allocatable :: k_y(:)
-     real(kind=rp), allocatable :: k_z(:)
-     real(kind=rp), allocatable :: k_x(:)
+     real(kind=xp), allocatable :: k_y(:)
+     real(kind=xp), allocatable :: k_z(:)
+     real(kind=xp), allocatable :: k_x(:)
      type(c_ptr) :: k_x_d = C_NULL_PTR
-     real(kind=rp), allocatable :: phase_shifts(:)
+     real(kind=xp), allocatable :: phase_shifts(:)
 
    contains
 
@@ -125,17 +125,17 @@ contains
        t_start, t_end, &
        periodic_x, periodic_y, periodic_z)
     class(FST_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: xstart
-    real(kind=rp), intent(in) :: xend
-    real(kind=rp), intent(in) :: ystart
-    real(kind=rp), intent(in) :: yend
-    real(kind=rp), intent(in) :: x_delta_rise
-    real(kind=rp), intent(in) :: x_delta_fall
-    real(kind=rp), intent(in) :: y_delta_rise
-    real(kind=rp), intent(in) :: y_delta_fall
-    real(kind=rp), intent(in) :: fringe_max
-    real(kind=rp), intent(in) :: t_start
-    real(kind=rp), intent(in) :: t_end
+    real(kind=xp), intent(in) :: xstart
+    real(kind=xp), intent(in) :: xend
+    real(kind=xp), intent(in) :: ystart
+    real(kind=xp), intent(in) :: yend
+    real(kind=xp), intent(in) :: x_delta_rise
+    real(kind=xp), intent(in) :: x_delta_fall
+    real(kind=xp), intent(in) :: y_delta_rise
+    real(kind=xp), intent(in) :: y_delta_fall
+    real(kind=xp), intent(in) :: fringe_max
+    real(kind=xp), intent(in) :: t_start
+    real(kind=xp), intent(in) :: t_end
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
 
     this%periodic_x = periodic_x
@@ -781,7 +781,7 @@ contains
   !   else if (x.ge.f%xend) then
   !      S=1
   !   else
-  !      S=1/(1+erp(1/(x-f%xend)+1/(x-f%xstart)))
+  !      S=1/(1+exp(1/(x-f%xend)+1/(x-f%xstart)))
   !   endif
 
   !   y = f%fringe_max * (S*(x-f%xstart)/(f%delta_rise)-S*((x-f%xend)/f%delta_fall+1))
@@ -811,7 +811,7 @@ contains
   ! Fringe function as described in Schlatter (2001), extended to take y bounds into account too
   !
   !   Here is what the fringe looks like, except the ramp-up is not linear
-  !   but erponential (see function S below)
+  !   but exponential (see function S below)
   !
   ! fringe_max      ________
   !                /        \
@@ -840,7 +840,7 @@ contains
 
   end function fringe
 
-  ! Smooth step function, 0 if x <= 0, 1 if x >= 1, 1/erp(1/(x-1) + 1/x) between 0 and 1
+  ! Smooth step function, 0 if x <= 0, 1 if x >= 1, 1/exp(1/(x-1) + 1/x) between 0 and 1
   function S(x) result(y)
     real(kind=rp), intent(in) :: x
     real(kind=rp)             :: y
