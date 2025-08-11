@@ -3,15 +3,18 @@
   "case":
   {
     "mesh_file": "box.nmsh",
-    "output_directory": "results",
+    "output_directory": "results_gpu_1",
     "output_at_end": true,
     "output_checkpoints": true,
     "checkpoint_control": "simulationtime",
     "checkpoint_value": 1.0,
+    "runtime_statistics": {
+      "enabled": false
+    },
     "time": {
       "end_time": 0.3,
-      "variable_timestep": true,
-      "timestep": 0.25e-2,
+      "variable_timestep": false,
+      "timestep": 1e-3,
       "max_timestep": 0.25e-2
     },
     "numerics": {
@@ -21,7 +24,7 @@
     },
 
     "FST": {
-      "enabled": false, // !!! FST IS DISABLED !!
+      "enabled": true, // !!! FST IS DISABLED !!
       "t_start": 0.00,
       "t_ramp": 0.001,
       "alpha": 0.15, // 15% distance to the y boundaries

@@ -57,12 +57,22 @@ contains
             ui => neko_field_registry%get_field("u")
             vi => neko_field_registry%get_field("v")
             wi => neko_field_registry%get_field("w")
+            ! Pressure can be handled directly on GPU
+            if (neko_bcknd_device .eq. 1) then
+               call device_masked_copy(u%x_d, ui%x_d, bc%msk_d, u%dof%size(), bc%msk(0))
+               call device_masked_copy(v%x_d, vi%x_d, bc%msk_d, v%dof%size(), bc%msk(0))
+               call device_masked_copy(w%x_d, wi%x_d, bc%msk_d, w%dof%size(), bc%msk(0))
+            else
+               call masked_copy(u%x, ui%x, bc%msk, u%dof%size(), bc%msk(0))
+               call masked_copy(v%x, vi%x, bc%msk, v%dof%size(), bc%msk(0))
+               call masked_copy(w%x, wi%x, bc%msk, w%dof%size(), bc%msk(0))
+            end if
 
             ! We need to do this on the CPU since the FST is applied 
             ! on the CPU on top of the baseflow given by u%x, v%x, w%x.
-            call masked_copy(u%x, ui%x, bc%msk, u%dof%size(), bc%msk(0))
-            call masked_copy(v%x, vi%x, bc%msk, v%dof%size(), bc%msk(0))
-            call masked_copy(w%x, wi%x, bc%msk, w%dof%size(), bc%msk(0))
+!!$            call masked_copy(u%x, ui%x, bc%msk, u%dof%size(), bc%msk(0))
+!!$            call masked_copy(v%x, vi%x, bc%msk, v%dof%size(), bc%msk(0))
+!!$            call masked_copy(w%x, wi%x, bc%msk, w%dof%size(), bc%msk(0))
          end if
 
          !
@@ -71,15 +81,15 @@ contains
          call fst_bc_driver_apply(u,v,w,bc,coef,t,tstep,angle=0.0_rp, memcpy=.false.)
 
          ! Synchronize to GPU
-         if (neko_bcknd_device .eq. 1) then
-            call device_memcpy(u%x, u%x_d, u%dof%size(), &
-                    host_to_device, sync = .false.)
-            call device_memcpy(v%x, v%x_d, v%dof%size(), &
-                    host_to_device, sync = .false.)
-            call device_memcpy(w%x, w%x_d, w%dof%size(), &
-                    host_to_device, sync = .false.)
-
-         end if
+!!$         if (neko_bcknd_device .eq. 1) then
+!!$            call device_memcpy(u%x, u%x_d, u%dof%size(), &
+!!$                    host_to_device, sync = .false.)
+!!$            call device_memcpy(v%x, v%x_d, v%dof%size(), &
+!!$                    host_to_device, sync = .false.)
+!!$            call device_memcpy(w%x, w%x_d, w%dof%size(), &
+!!$                    host_to_device, sync = .false.)
+!!$
+!!$         end if
        end associate
 
     !

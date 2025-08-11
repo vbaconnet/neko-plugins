@@ -119,8 +119,8 @@ contains
 
   !> Initialize all parameters
   subroutine FST_init_common(this, &
-       xstart, xend, x_delta_rise, x_delta_fall, &
-       ystart, yend, y_delta_rise, y_delta_fall, &
+       xmin, xmax, xstart, xend, x_delta_rise, x_delta_fall, &
+       ymin, ymax, ystart, yend, y_delta_rise, y_delta_fall, &
        fringe_max, &
        t_start, t_end, &
        periodic_x, periodic_y, periodic_z)
@@ -147,10 +147,10 @@ contains
     this%ystart = ystart
     this%yend   = yend
 
-    this%xmin   = this%xstart + x_delta_rise/3.0_rp
-    this%xmax   = this%xend   - x_delta_fall/3.0_rp
-    this%ymin   = this%ystart + y_delta_rise/3.0_rp
-    this%ymax   = this%yend   - y_delta_fall/3.0_rp
+    this%xmin   = xmin
+    this%xmax   = xmax
+    this%ymin   = ymin
+    this%ymax   = ymax
 
     this%fringe_max = fringe_max
     this%x_delta_rise = x_delta_rise!0.002
@@ -342,8 +342,8 @@ contains
 
     call neko_log%section('Initializing FST')
 
-    call this%init_common(xstart, xend, x_delta_rise, x_delta_fall, ystart, &
-         yend, y_delta_rise, y_delta_fall, fringe_max, t_start, t_end, &
+    call this%init_common(xstart, xend,xstart,xend,x_delta_rise, x_delta_fall, ystart, &
+         yend, ystart, yend, y_delta_rise, y_delta_fall, fringe_max, t_start, t_end, &
          periodic_x, periodic_y, periodic_z)
 
     call this%print() ! show parameters
@@ -356,16 +356,14 @@ contains
 
   !> Initialize the FST to use as a boundary condition
   subroutine FST_init_bc(this, &
-       xstart, xend, x_delta_rise, x_delta_fall, &
-       ystart, yend, y_delta_rise, y_delta_fall, &
+       xmin, xmax, xstart, xend, x_delta_rise, x_delta_fall, &
+       ymin, ymax, ystart, yend, y_delta_rise, y_delta_fall, &
        t_start, t_end, &
        periodic_x, periodic_y, periodic_z)
 
     class(FST_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: xstart
-    real(kind=rp), intent(in) :: xend
-    real(kind=rp), intent(in) :: ystart
-    real(kind=rp), intent(in) :: yend
+    real(kind=rp), intent(in) :: xstart, xend, xmin, xmax
+    real(kind=rp), intent(in) :: ystart, yend, ymin, ymax
     real(kind=rp), intent(in) :: x_delta_rise
     real(kind=rp), intent(in) :: x_delta_fall
     real(kind=rp), intent(in) :: y_delta_rise
@@ -376,9 +374,10 @@ contains
 
     call neko_log%section('Initializing FST')
 
-    call this%init_common(xstart, xend, x_delta_rise, x_delta_fall, ystart, &
-         yend, y_delta_rise, y_delta_fall, 1.0_rp, t_start, t_end, &
-         periodic_x, periodic_y, periodic_z)
+    call this%init_common(xmin, xmax, xstart, xend, x_delta_rise, &
+            x_delta_fall, ymin, ymax, ystart, yend, y_delta_rise, &
+            y_delta_fall, 1.0_rp, t_start, t_end, &
+            periodic_x, periodic_y, periodic_z)
 
     call this%print() ! show parameters
     call neko_log%end_section('Done --> Intializing FST')
@@ -818,10 +817,10 @@ contains
   !               /          \
   ! 0.0 _________/            \_______
   !
-  !   xstart   xmin         xmax   xend
+  !   xmin   xstart         xend   xmax
   !
-  ! The distance between xstart and xmin is delta_rise/3, and the ramp-up
-  ! after xmin is of length delta_rise. The same applies for the ramp down
+  ! The ramp-up 
+  ! after xstart is of length delta_rise. The same applies for the ramp down
   ! and the distance between xmax and xend. If y is specified then it computes
   ! a 2D fringe
   function fringe(x, y, f) result(fr)
