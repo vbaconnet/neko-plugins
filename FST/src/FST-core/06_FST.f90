@@ -17,7 +17,7 @@ module FST
   use math, only: masked_gather_copy
   use device_math, only: device_masked_gather_copy
   use num_types, only: rp, xp
-  use comm, only: pe_rank, MPI_REAL_PRECISION, MPI_INTEGER, NEKO_COMM
+  use comm, only: pe_rank, MPI_EXTRA_PRECISION, NEKO_COMM
   use neko_config, only: NEKO_BCKND_DEVICE
   use mpi_f08
   use device, only: device_map, device_memcpy, HOST_TO_DEVICE, device_get_ptr
@@ -27,7 +27,7 @@ module FST
 
   type, public :: FST_t
 
-     real(kind=rp) :: Uinf
+     real(kind=xp) :: Uinf
 
      ! periodic directions
      logical :: periodic_x
@@ -35,20 +35,20 @@ module FST
      logical :: periodic_z
 
      ! x fringe
-     real(kind=xp) :: xmin
-     real(kind=xp) :: xmax
-     real(kind=xp) :: xstart 
-     real(kind=xp) :: xend
-     real(kind=xp) :: x_delta_rise
-     real(kind=xp) :: x_delta_fall
+     real(kind=rp) :: xmin
+     real(kind=rp) :: xmax
+     real(kind=rp) :: xstart
+     real(kind=rp) :: xend
+     real(kind=rp) :: x_delta_rise
+     real(kind=rp) :: x_delta_fall
 
      ! y fringe
-     real(kind=xp) :: ymin
-     real(kind=xp) :: ymax
-     real(kind=xp) :: ystart
-     real(kind=xp) :: yend
-     real(kind=xp) :: y_delta_rise
-     real(kind=xp) :: y_delta_fall
+     real(kind=rp) :: ymin
+     real(kind=rp) :: ymax
+     real(kind=rp) :: ystart
+     real(kind=rp) :: yend
+     real(kind=rp) :: y_delta_rise
+     real(kind=rp) :: y_delta_fall
 
      !> Total fringe amplitude
      real(kind=xp) :: fringe_max
@@ -68,9 +68,9 @@ module FST
      type(c_ptr) :: fringe_space_d = C_NULL_PTR
 
      !> Baseflows, if applying on a non-uniform inflow
-     real(kind=xp), allocatable :: u_baseflow(:)
-     real(kind=xp), allocatable :: v_baseflow(:)
-     real(kind=xp), allocatable :: w_baseflow(:)
+     real(kind=rp), allocatable :: u_baseflow(:)
+     real(kind=rp), allocatable :: v_baseflow(:)
+     real(kind=rp), allocatable :: w_baseflow(:)
      type(c_ptr) :: u_baseflow_d = C_NULL_PTR
      type(c_ptr) :: v_baseflow_d = C_NULL_PTR
      type(c_ptr) :: w_baseflow_d = C_NULL_PTR
@@ -125,14 +125,12 @@ contains
        t_start, t_end, &
        periodic_x, periodic_y, periodic_z)
     class(FST_t), intent(inout) :: this
-    real(kind=xp), intent(in) :: xstart
-    real(kind=xp), intent(in) :: xend
-    real(kind=xp), intent(in) :: ystart
-    real(kind=xp), intent(in) :: yend
-    real(kind=xp), intent(in) :: x_delta_rise
-    real(kind=xp), intent(in) :: x_delta_fall
-    real(kind=xp), intent(in) :: y_delta_rise
-    real(kind=xp), intent(in) :: y_delta_fall
+    real(kind=rp), intent(in) :: xstart, xend, xmin, xmax
+    real(kind=rp), intent(in) :: ystart, yend, ymin, ymax
+    real(kind=rp), intent(in) :: x_delta_rise
+    real(kind=rp), intent(in) :: x_delta_fall
+    real(kind=rp), intent(in) :: y_delta_rise
+    real(kind=rp), intent(in) :: y_delta_fall
     real(kind=xp), intent(in) :: fringe_max
     real(kind=xp), intent(in) :: t_start
     real(kind=xp), intent(in) :: t_end
@@ -173,14 +171,14 @@ contains
   !!  shellno, kx, ky, kz, amp, u_hat_pn(1), u_hat_pn(2), u_hat_pn(3)
   subroutine FST_init_from_files(this, Uinf)
     class(FST_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: Uinf
+    real(kind=xp), intent(in) :: Uinf
 
     integer :: unit, ios, num_columns, num_lines, n_modes_total, i, np_eff, &
          ierr, prev_shell, idx_shell_amp
     character(len=1) :: delimiter
     character(len=1024) :: line
     character(len=20) :: keyword
-    real(kind=rp) :: tmp
+    real(kind=xp) :: tmp
     delimiter = ','
 
     this%Uinf = Uinf
@@ -275,8 +273,8 @@ contains
                this%k_y(i), this%k_z(i), this%shell_amp((i-1)/np_eff+1), &
                this%random_vectors(i,1), this%random_vectors(i,2), &
                this%random_vectors(i,3)
-          print *, "<<0>>",this%shell(i), this%k_x(i), this%k_y(i), this%k_z(i), this%shell_amp((i-1)/np_eff+1), &
-               this%random_vectors(i,1), this%random_vectors(i,2), this%random_vectors(i,3)
+          !print *, "<<0>>",this%shell(i), this%k_x(i), this%k_y(i), this%k_z(i), this%shell_amp((i-1)/np_eff+1), &
+          !     this%random_vectors(i,1), this%random_vectors(i,2), this%random_vectors(i,3)
        end do
        close(unit)
 
@@ -291,27 +289,27 @@ contains
 
     end if
 
-    call MPI_Bcast(this%k_x, this%n_modes_total, MPI_REAL_PRECISION, 0, &
+    call MPI_Bcast(this%k_x, this%n_modes_total, MPI_EXTRA_PRECISION, 0, &
          NEKO_COMM, ierr)
-    call MPI_Bcast(this%k_y, this%n_modes_total, MPI_REAL_PRECISION, 0, &
+    call MPI_Bcast(this%k_y, this%n_modes_total, MPI_EXTRA_PRECISION, 0, &
          NEKO_COMM, ierr)
-    call MPI_Bcast(this%k_z, this%n_modes_total, MPI_REAL_PRECISION, 0, &
+    call MPI_Bcast(this%k_z, this%n_modes_total, MPI_EXTRA_PRECISION, 0, &
          NEKO_COMM, ierr)
     call MPI_Bcast(this%shell, this%n_modes_total, MPI_INTEGER, 0, NEKO_COMM, &
          ierr)
-    call MPI_Bcast(this%shell_amp, this%nshells, MPI_REAL_PRECISION, 0, &
+    call MPI_Bcast(this%shell_amp, this%nshells, MPI_EXTRA_PRECISION, 0, &
          NEKO_COMM, ierr)
     call MPI_Bcast(this%random_vectors, this%n_modes_total*3, &
-         MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
-    call MPI_Bcast(this%phase_shifts, this%n_modes_total, MPI_REAL_PRECISION, &
+         MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr)
+    call MPI_Bcast(this%phase_shifts, this%n_modes_total, MPI_EXTRA_PRECISION, &
          0, NEKO_COMM, ierr)
     call MPI_Barrier(NEKO_COMM, ierr)
 
     if (pe_rank .eq. 1) then
        do i = 1, this%n_modes_total
-          print *, "<<1>>", this%shell(i), this%k_x(i), this%k_y(i), this%k_z(i), &
-          this%shell_amp((i-1)/78 +1), &
-               this%random_vectors(i,1), this%random_vectors(i,2), this%random_vectors(i,3)
+          !print *, "<<1>>", this%shell(i), this%k_x(i), this%k_y(i), this%k_z(i), &
+          !this%shell_amp((i-1)/78 +1), &
+          !     this%random_vectors(i,1), this%random_vectors(i,2), this%random_vectors(i,3)
        end do
     end if
 
@@ -335,9 +333,9 @@ contains
     real(kind=rp), intent(in) :: x_delta_fall
     real(kind=rp), intent(in) :: y_delta_rise
     real(kind=rp), intent(in) :: y_delta_fall
-    real(kind=rp), intent(in) :: fringe_max
-    real(kind=rp), intent(in) :: t_start
-    real(kind=rp), intent(in) :: t_end
+    real(kind=xp), intent(in) :: fringe_max
+    real(kind=xp), intent(in) :: t_start
+    real(kind=xp), intent(in) :: t_end
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
 
     call neko_log%section('Initializing FST')
@@ -368,15 +366,15 @@ contains
     real(kind=rp), intent(in) :: x_delta_fall
     real(kind=rp), intent(in) :: y_delta_rise
     real(kind=rp), intent(in) :: y_delta_fall
-    real(kind=rp), intent(in) :: t_start
-    real(kind=rp), intent(in) :: t_end
+    real(kind=xp), intent(in) :: t_start
+    real(kind=xp), intent(in) :: t_end
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
 
     call neko_log%section('Initializing FST')
 
     call this%init_common(xmin, xmax, xstart, xend, x_delta_rise, &
             x_delta_fall, ymin, ymax, ystart, yend, y_delta_rise, &
-            y_delta_fall, 1.0_rp, t_start, t_end, &
+            y_delta_fall, 1.0_xp, t_start, t_end, &
             periodic_x, periodic_y, periodic_z)
 
     call this%print() ! show parameters
@@ -483,35 +481,35 @@ contains
     class(point_zone_t), intent(in) :: zone
     type(field_t), intent(in) :: u, v, w
 
-    real(kind=rp) :: x, y, z
+    real(kind=xp) :: x, y, z
     integer :: ierr, i, idx
 
-    ! Do the general generation
-    call this%generate_common(coef)
+    !! Do the general generation
+    !call this%generate_common(coef)
 
-    !
-    ! Copy the baseflow in the zone
-    !
-    call this%apply_baseflow(zone%mask, zone%size, u, v, w)
+    !!
+    !! Copy the baseflow in the zone
+    !!
+    !call this%apply_baseflow(zone%mask, zone%size, u, v, w)
 
-    ! Generate the fringe in space
-    allocate(this%fringe_space(zone%size))
+    !! Generate the fringe in space
+    !allocate(this%fringe_space(zone%size))
 
-    ! Initialize the fringe in space
-    do idx = 1, zone%size
-       i = zone%mask(idx)
-       x = coef%dof%x(i,1,1,1)
-       y = coef%dof%y(i,1,1,1)
-       z = coef%dof%z(i,1,1,1)
+    !! Initialize the fringe in space
+    !do idx = 1, zone%size
+    !   i = zone%mask(idx)
+    !   x = coef%dof%x(i,1,1,1)
+    !   y = coef%dof%y(i,1,1,1)
+    !   z = coef%dof%z(i,1,1,1)
 
-       if ( x .lt. this%xmin .or. x .gt. this%xmax .or. &
-            y .lt. this%ymin .or. y .gt. this%ymax ) then
-          this%fringe_space(idx) = 0.0_rp
-       else
-          this%fringe_space(idx) = fringe(x, y, this)
-       end if
+    !   if ( x .lt. this%xmin .or. x .gt. this%xmax .or. &
+    !        y .lt. this%ymin .or. y .gt. this%ymax ) then
+    !      this%fringe_space(idx) = 0.0_xp
+    !   else
+    !      this%fringe_space(idx) = fringe(x, y, this)
+    !   end if
 
-    end do
+    !end do
 
   end subroutine FST_generate_forcing
 
@@ -533,7 +531,7 @@ contains
     !
     if (regen) call this%generate_common(coef)
 
-    call this%init_from_files(2.0_rp)
+    call this%init_from_files(2.0_xp)
 
     !
     ! Apply baseflow in the bc zone
@@ -553,7 +551,7 @@ contains
 
        if ( z .lt. this%xmin .or. z .gt. this%xmax .or. &
             y .lt. this%ymin .or. y .gt. this%ymax ) then
-          this%fringe_space(idx) = 0.0_rp
+          this%fringe_space(idx) = 0.0_xp
        else
           this%fringe_space(idx) = fringe(z, y, this)
        end if
@@ -572,7 +570,6 @@ contains
       do m = 1, this%n_modes_total
         this%phi_0(m,j) = this%k_x(m)*x + this%k_y(m)*y + this%k_z(m)*z + &
              this%phase_shifts(m)
-        if (j == 1) print *, m, this%phi_0(m,j)
       end do
     end do
 
@@ -689,16 +686,15 @@ contains
   ! Apply FST as a boundary condition based on the bc mask
   ! Assumes that u,v,w have the same bc masks
   subroutine FST_apply_BC(this, bc_mask, n, &
-       x, y, z, t, &
+       t, &
        u_bc, v_bc, w_bc, angleXY, on_host)
 
     class(FST_t), intent(in) :: this
     integer, intent(in) :: n ! size of the bc mask
     integer, intent(in) :: bc_mask(0:n)
-    real(kind=rp), intent(in), dimension(:,:,:,:) :: x, y, z
     real(kind=rp), intent(in) :: t
     real(kind=rp), intent(inout), dimension(:,:,:,:) :: u_bc, v_bc, w_bc
-    real(kind=rp), intent(in) :: angleXY
+    real(kind=xp), intent(in) :: angleXY
     logical, intent(in) :: on_host
 
 !!$    integer :: idx, l, m, i, shellno
@@ -706,7 +702,7 @@ contains
 !!$    real(kind=rp) :: phase_shft, phi, amp, pert, urand, vrand, wrand
 !!$    real(kind=rp) :: rand_vec(gdim), vel_mag, phi_t
 
-    real(kind=rp) :: fringe_time, cosa, sina
+    real(kind=xp) :: fringe_time, cosa, sina
 
     fringe_time = time_ramp(t, this%t_end, this%t_start)
     cosa = cos(angleXY)
@@ -791,17 +787,17 @@ contains
   ! Linear ramp in time
   function time_ramp(t, t_end, t_start) result(ramp)
     real(kind=rp), intent(in) :: t
-    real(kind=rp), intent(in) :: t_end
-    real(kind=rp), intent(in) :: t_start
+    real(kind=xp), intent(in) :: t_end
+    real(kind=xp), intent(in) :: t_start
 
-    real(kind=rp) :: ramp
+    real(kind=xp) :: ramp
 
     if (t .le. t_start) then
-       ramp = 0.0_rp
+       ramp = 0.0_xp
     else if (t .lt. t_end) then 
        ramp = (t - t_start)/(t_end - t_start)
     else
-       ramp = 1.0_rp
+       ramp = 1.0_xp
     end if
 
   end function time_ramp
@@ -827,7 +823,7 @@ contains
     real(kind=rp), intent(in) :: x
     real(kind=rp), intent(in), optional :: y
     type(FST_t), intent(in) :: f
-    real(kind=rp) :: fr
+    real(kind=xp) :: fr
     integer :: i
     character :: a
 
@@ -844,12 +840,12 @@ contains
     real(kind=rp), intent(in) :: x
     real(kind=rp)             :: y
 
-    if ( x.le.0._rp ) then
-       y = 0._rp
-    else if ( x.ge.1._rp ) then
-       y = 1._rp
+    if ( x.le.0._xp ) then
+       y = 0._xp
+    else if ( x.ge.1._xp ) then
+       y = 1._xp
     else
-       y = 1._rp / (1._rp + exp( 1._rp/(x-1._rp) + 1._rp/x))
+       y = 1._xp / (1._xp + exp( 1._xp/(x-1._xp) + 1._xp/x))
     end if
 
   end function S

@@ -32,7 +32,7 @@
 !
 !> Operators accelerator backends
 module opr_fst_device
-  use num_types, only : rp, c_rp
+  use num_types, only : rp, xp, c_rp, c_xp
   use device, only : device_get_ptr
   use utils, only : neko_error
   use comm
@@ -49,10 +49,11 @@ module opr_fst_device
             shell_amp_d, randvec_d, cosa, sina, fringe_time, fs_d) &
             bind(c, name = 'cuda_fst')
        use, intrinsic :: iso_c_binding
-       import c_rp
+       import c_rp, c_xp
        type(c_ptr), value :: u_d,v_d,w_d,mask_d,ubf_d,vbf_d,wbf_d,&
             k_x_d, phi_0_d, shell_d, shell_amp_d, randvec_d, fs_d
-       real(kind=c_rp) :: t, Uinf, cosa, sina, fringe_time
+       real(kind=c_rp) :: t
+       real(kind=c_xp) :: Uinf, cosa, sina, fringe_time
        integer(c_int) :: n_mask, n_total_modes
      end subroutine cuda_fst
   end interface
@@ -63,10 +64,11 @@ module opr_fst_device
             shell_amp_d, randvec_d, cosa, sina, fringe_time, fs_d) &
             bind(c, name = 'hip_fst')
        use, intrinsic :: iso_c_binding
-       import c_rp
+       import c_rp, c_xp
        type(c_ptr), value :: u_d,v_d,w_d,mask_d,ubf_d,vbf_d,wbf_d,&
             k_x_d, phi_0_d, shell_d, shell_amp_d, randvec_d, fs_d
-       real(c_rp) :: t, Uinf, cosa, sina, fringe_time
+       real(kind=c_rp) :: t
+       real(kind=c_xp) :: Uinf, cosa, sina, fringe_time
        integer(c_int) :: n_mask, n_total_modes
      end subroutine hip_fst
   end interface
@@ -77,7 +79,8 @@ contains
   subroutine opr_fst_device_fst(t, Uinf,u_d,v_d,w_d, mask_d,n_mask, &
        ubf_d, vbf_d, wbf_d, k_x_d, n_total_modes, phi_0_d, shell_d, &
        shell_amp_d, randvec_d, cosa, sina, fringe_time, fs_d)
-    real(kind=rp) :: t, Uinf, cosa, sina, fringe_time
+    real(kind=c_rp) :: t
+    real(kind=c_xp) :: Uinf, cosa, sina, fringe_time
     integer :: n_mask, n_total_modes
     type(c_ptr) :: fs_d, ubf_d, vbf_d, wbf_d, phi_0_d, randvec_d, shell_d, &
          shell_amp_d, k_x_d, u_d, v_d, w_d, mask_d

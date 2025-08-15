@@ -55,8 +55,8 @@ module fst_bc_driver
     type(field_t), pointer :: fu,fv,fw
     character(len=:), allocatable :: read_str, fname
     logical :: px, py, pz
-    real(kind=xp) :: x, ymin, ymax, zmin, zmax, delta_y, delta_z, Ly, Lz
-    real(kind=xp) :: ystart, yend, zstart, zend
+    real(kind=rp) :: x, ymin, ymax, zmin, zmax, delta_y, delta_z, Ly, Lz
+    real(kind=rp) :: ystart, yend, zstart, zend
     integer :: i, idx, ierr, n
     real(kind=xp) :: alpha, beta, t_ramp, t_start, amp
 
@@ -134,7 +134,7 @@ module fst_bc_driver
     
     ! Read parameters for the FST fringe in time
     call json_get(params, "case.FST.t_ramp", t_ramp)
-    call json_get_or_default(params, "case.FST.t_start", t_start, 0.0_rp)
+    call json_get_or_default(params, "case.FST.t_start", t_start, 0.0_xp)
 
     ! Initialize the fst parameters
     call FST_OBJ%init_bc(zmin, zmax, zstart, zend, &
@@ -155,7 +155,7 @@ module fst_bc_driver
     type(coef_t), intent(inout) :: coef
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
-    real(kind=rp), intent(in) :: angle
+    real(kind=xp), intent(in) :: angle
     logical, intent(in) :: on_cpu, regen
 
     integer :: i, idx
@@ -175,14 +175,12 @@ module fst_bc_driver
     ! NOTE: if on_cpu is true, memory is not copied to the GPU (you need
     ! to do it yourself)
     call FST_obj%apply_BC(bc%msk, bc%msk(0), &
-         u%dof%x, u%dof%y, u%dof%z, t, u%x, v%x, w%x, angle, on_cpu)
+         t, u%x, v%x, w%x, angle, on_cpu)
 
   end subroutine fst_bc_driver_apply
 
   ! Finalize user variables or external objects
-  subroutine fst_bc_driver_finalize(t, params)
-    real(kind=rp) :: t
-    type(json_file), intent(inout) :: params
+  subroutine fst_bc_driver_finalize()
 
     if (.not. ENABLED) return
 

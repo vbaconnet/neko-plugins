@@ -1,7 +1,6 @@
 module sphere
   use neko
   use global_params
-  ! use global_params
   implicit none
   
 contains
