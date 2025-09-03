@@ -46,14 +46,22 @@ $$
 With
 
 $$
-\lambda_y = S\left( \frac{y - y_{start}}{\delta_{y,rise}}\right) - S\left( \frac{y - y_{end}}{\delta_{y,fall}}\right) + 1
+\lambda_u = S\left( \frac{u - u_{start}}{\delta_{u,rise}}\right) - S\left( \frac{u - u_{end}}{\delta_{u,fall}}\right) + 1
 $$
 
-and the same for z. Note that $\lambda_y(y) = 1$ if `"periodic_y": true`, and the same applies for z.
+Note that $\lambda_u = 1$ if the direction `u` is set to be periodic.
+
+`_start` and `_end` parameters need to be set by the user, which represent geometrical coordinates. 
+By default, and only if the direction is not periodic, `_start` will be set to the minimum coordinate on the boundary (in that direction). 
+The same goes for `_end`, it will be by default set to the maximum value.
+The quantities $\delta_{u,*}$ are computed as a percentage $\alpha$ of the total boundary length 
+in the direction `u`: $\delta_{u,rise} = \delta_{u,fall} = \alpha * L_u$, where 
+$L_u$ is the total domain length at the inlet in the direction u. 
 
 The parameters that need to be set are:
 - `y_start` and `y_end` if the `y` direction is not periodic
 - `z_start` and `z_end` if the `z` direction is not periodic
+- `alpha`, which takes a number between 0 and 1 (there is no check if > 1 or < 0).
 
 Note that if any direction is set to periodic, the corresponding parameters _start and _end will not be used.
 
