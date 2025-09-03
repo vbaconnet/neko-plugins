@@ -114,8 +114,8 @@ module fst_bc_driver
        ystart  = ymin + delta_y
        yend    = ymax - delta_y 
     else
-       call json_get(params, "case.FST.ystart", ystart)
-       call json_get(params, "case.FST.yend", yend)
+       call json_get_or_default(params, "case.FST.ystart", ystart, ymin)
+       call json_get_or_default(params, "case.FST.yend", yend, ymax)
        delta_y = alpha*Ly
     end if
 
@@ -127,8 +127,8 @@ module fst_bc_driver
        zstart  = zmin + delta_z
        zend    = zmax - delta_z 
     else
-       call json_get(params, "case.FST.zstart", zstart)
-       call json_get(params, "case.FST.zend", zend)
+       call json_get_or_default(params, "case.FST.zstart", zstart, zmin)
+       call json_get_or_default(params, "case.FST.zend", zend, zmax)
        delta_z = alpha * Lz
     end if
     

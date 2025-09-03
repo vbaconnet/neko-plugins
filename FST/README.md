@@ -46,7 +46,7 @@ $$
 With
 
 $$
-\lambda_u = S\left( \frac{u - u_{start}}{\delta_{u,rise}}\right) - S\left( \frac{u - u_{end}}{\delta_{u,fall}}\right) + 1
+\lambda_u = S\left( \frac{u - u_{start}}{\delta_{u,rise}}\right) - S\left( \frac{u - u_{end}}{\delta_{u,fall}}+1\right)
 $$
 
 Note that $\lambda_u = 1$ if the direction `u` is set to be periodic.
@@ -67,8 +67,6 @@ Note that if any direction is set to periodic, the corresponding parameters _sta
 
 ### Time parameters
 
-The parameter `alpha` is used to specify the delta_rise and delta_fall parameters for the firnge function in space. Basically, instead of specifying the rise and fall
-lengths for the fringe function, we give a percentage of the total boundary length. This is so that you can avoid applying FST close to the boundaries that might make 
-the simulation blow up. If you don't want to do this you can set `alpha` to a very small value or tweak a few things in the `07_fst_bc_driver` module).
-
-You must specify parameters `periodic_y` and `periodic_z` to `true` if your simulation is periodic in any (or both) of those directions. 
+It is possible to set a linear ramp in time to gradually apply the FST. Use the following parameters:
+- `t_start`, the time at which to start applying the FST 
+- `t_ramp`, the length of the linear ramp, where the amplitude of the FST grows linear up to 1 at `t = t_start + t_ramp`
