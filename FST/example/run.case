@@ -3,9 +3,10 @@
   "case":
   {
     "mesh_file": "box.nmsh",
-    "output_directory": "results_gpu_1",
+    "output_directory": "gpu",
     "output_at_end": true,
     "output_checkpoints": true,
+    "output_boundary": true,
     "checkpoint_control": "simulationtime",
     "checkpoint_value": 1.0,
     "runtime_statistics": {
@@ -36,8 +37,9 @@
       "Re": 3000,
       "initial_condition": {
         "type": "field",
-        "file_name": "IC/field0.f00008",
-        "mesh_file_name": "IC/field0.f00000",
+	"value": [1.0, 0.0, 0.0],
+        "file_name": "../example/IC/field0.f00008",
+        "mesh_file_name": "../example/IC/field0.f00000",
         "interpolate": true
       },
       "velocity_solver": {
