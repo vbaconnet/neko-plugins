@@ -1,8 +1,6 @@
 *.mod
 *.o
 *.smod
-example
-example/*
 *.f0*
 *.nek5000
 bb.txt

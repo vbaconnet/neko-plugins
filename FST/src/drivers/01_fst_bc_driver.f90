@@ -176,12 +176,20 @@ module fst_bc_driver
     call FST_obj%apply_BC(bc%msk, bc%msk(0), &
          u%dof%x, u%dof%y, u%dof%z, t, u%x, v%x, w%x, angle, on_cpu)
 
+    ! If we compute on cpu, copy memory. This is slower!
+    if (NEKO_BCKND_DEVICE .eq. 1 .and. on_cpu) then
+        if (pe_rank .eq. 0) call neko_warning("You are computing FST on CPU")
+        if (pe_rank .eq. 0) call neko_warning("You are copying memory to GPU")
+        if (pe_rank .eq. 0) call neko_warning("This is very slow! Check on_host")
+        call device_memcpy(u%x, u%x_d, u%size(), HOST_TO_DEVICE, .false.)
+        call device_memcpy(v%x, v%x_d, v%size(), HOST_TO_DEVICE, .false.)
+        call device_memcpy(w%x, w%x_d, w%size(), HOST_TO_DEVICE, .false.)
+    end if
+
   end subroutine fst_bc_driver_apply
 
   ! Finalize user variables or external objects
-  subroutine fst_bc_driver_finalize(t, params)
-    real(kind=rp) :: t
-    type(json_file), intent(inout) :: params
+  subroutine fst_bc_driver_finalize()
 
     if (.not. ENABLED) return
 
