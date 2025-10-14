@@ -33,9 +33,20 @@ Checklist (with FST):
 
 # To use these files on dardel:
 
-1. Create a folder `src` in your running directory
-2. Copy all of the files starting with a `0` from this repository into your `src` directory
-3. Copy `user.f90` and `run.case` in the directory upstream of `src` in such a way that you can compile using with:
-```shell
-makeneko src/0* user.f90
+1. Copy the file `makeneko_gpu` or `makeneko_cpu` to the current directory depending on if you want to run on CPUs or GPUs.
+```bash
+# Example if you are in the same directory as this readme and want to run on gpus
+cp ../makeneko_gpu .
+```
+2. Execute the script with the following arguments: ./makeneko_gpu YOUR_USER_FILE.f90 PATH_TO_NEKO hip PATH_TO_FST_SRC_FOLDER
+
+For example:
+```bash
+# Example if you are in the same folder as the readme.
+./makeneko_gpu user.f90 /home/data/tomotakaichikawa/Neko/neko hip ../src
+```
+
+3. Then you can run neko as you would do it normally on dardel. You need a batch script for this.
+```bash
+sbatch batch.sh
 ```
