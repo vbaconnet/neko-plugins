@@ -13,7 +13,7 @@ module FST
   use utils, only: neko_error
   use point_zone, only: point_zone_t
   use comm, only: pe_rank
-  use math, only: masked_gather_copy
+  use math, only: masked_gather_copy_0
   use device_math, only: device_masked_gather_copy_0
   use device, only: device_map, device_memcpy, HOST_TO_DEVICE
   implicit none
@@ -286,9 +286,9 @@ contains
        call device_masked_gather_copy(this%v_baseflow_d, v%x_d, mask_d, u%dof%size(), n)
        call device_masked_gather_copy(this%w_baseflow_d, w%x_d, mask_d, u%dof%size(), n)
     else
-       call masked_gather_copy(this%u_baseflow, u%x, mask, u%dof%size(), n)
-       call masked_gather_copy(this%v_baseflow, v%x, mask, u%dof%size(), n)
-       call masked_gather_copy(this%w_baseflow, w%x, mask, u%dof%size(), n)
+       call masked_gather_copy_0(this%u_baseflow, u%x, mask, u%dof%size(), n)
+       call masked_gather_copy_0(this%v_baseflow, v%x, mask, u%dof%size(), n)
+       call masked_gather_copy_0(this%w_baseflow, w%x, mask, u%dof%size(), n)
     end if
          
   end subroutine FST_apply_baseflow_0
@@ -319,13 +319,13 @@ contains
 
        mask_d = device_get_ptr(mask)
 
-       call device_masked_gather_copy(this%u_baseflow_d, u%x_d, mask_d, u%dof%size(), n)
-       call device_masked_gather_copy(this%v_baseflow_d, v%x_d, mask_d, u%dof%size(), n)
-       call device_masked_gather_copy(this%w_baseflow_d, w%x_d, mask_d, u%dof%size(), n)
+       call device_masked_gather_copy_0(this%u_baseflow_d, u%x_d, mask_d, u%dof%size(), n)
+       call device_masked_gather_copy_0(this%v_baseflow_d, v%x_d, mask_d, u%dof%size(), n)
+       call device_masked_gather_copy_0(this%w_baseflow_d, w%x_d, mask_d, u%dof%size(), n)
     else
-       call masked_gather_copy(this%u_baseflow, u%x, mask, u%dof%size(), n)
-       call masked_gather_copy(this%v_baseflow, v%x, mask, u%dof%size(), n)
-       call masked_gather_copy(this%w_baseflow, w%x, mask, u%dof%size(), n)
+       call masked_gather_copy_0(this%u_baseflow, u%x, mask, u%dof%size(), n)
+       call masked_gather_copy_0(this%v_baseflow, v%x, mask, u%dof%size(), n)
+       call masked_gather_copy_0(this%w_baseflow, w%x, mask, u%dof%size(), n)
     end if
          
   end subroutine FST_apply_baseflow
