@@ -282,9 +282,9 @@ contains
 
        mask_d = device_get_ptr(mask)
 
-       call device_masked_gather_copy(this%u_baseflow_d, u%x_d, mask_d, u%dof%size(), n)
-       call device_masked_gather_copy(this%v_baseflow_d, v%x_d, mask_d, u%dof%size(), n)
-       call device_masked_gather_copy(this%w_baseflow_d, w%x_d, mask_d, u%dof%size(), n)
+       call device_masked_gather_copy_0(this%u_baseflow_d, u%x_d, mask_d, u%dof%size(), n)
+       call device_masked_gather_copy_0(this%v_baseflow_d, v%x_d, mask_d, u%dof%size(), n)
+       call device_masked_gather_copy_0(this%w_baseflow_d, w%x_d, mask_d, u%dof%size(), n)
     else
        call masked_gather_copy_0(this%u_baseflow, u%x, mask, u%dof%size(), n)
        call masked_gather_copy_0(this%v_baseflow, v%x, mask, u%dof%size(), n)
