@@ -36,7 +36,7 @@
 #include <stdlib.h>
 #include <hip/hip_runtime.h>
 #include <device/hip/check.h>
-#include <device_config.h>
+#include <device/device_config.h>
 
 /**
  * Device kernel for FST
