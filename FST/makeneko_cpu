@@ -1,9 +1,29 @@
 #!/bin/bash
 
-backend="bcknd/cpu/opr_fst_cpu.f90 bcknd/device/opr_fst_device.F90"
-interface="fst_operator.f90"
-fst_core="FST-core/0*"
-driver="drivers/0*"
+usage() {
 
-echo $NEKO/install_cpu/bin/makeneko $backend $interface $fst_core $driver $1
-$NEKO/install_cpu/bin/makeneko $backend $interface $fst_core $driver $1
+  echo "Usage"
+  echo "./makeneko_cpu <user file> <path to neko install> <path to src folder>"
+  echo ""
+  echo "Example"
+  echo "./makeneko_cpu swept-wing.f90 /cfs/klemming/scratch/y/ycl/Neko/neko ./src"
+
+}
+
+# Check if exactly 4 arguments are given
+if [ "$#" -ne 3 ]; then
+  echo "Error: Exactly 4 arguments are required."
+  usage
+  exit
+fi
+
+NEKO_INSTALL_PATH=${2}
+src_path=${3}
+
+backend="${src_path}/bcknd/cpu/opr_fst_cpu.f90 ${src_path}/bcknd/device/opr_fst_device.F90"
+interface="${src_path}/fst_operator.f90"
+fst_core="${src_path}/FST-core/0*"
+driver="${src_path}/drivers/0*"
+
+echo ${NEKO_INSTALL_PATH}/bin/makeneko $backend $interface $fst_core $driver $1
+${NEKO_INSTALL_PATH}/bin/makeneko $backend $interface $fst_core $driver $1
