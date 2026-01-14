@@ -22,10 +22,10 @@ contains
     type(field_t)  , pointer :: p
     type(coef_t)   , pointer :: coef
 
-    u => neko_field_registry%get_field("u")
-    v => neko_field_registry%get_field("v")
-    w => neko_field_registry%get_field("w")
-    p => neko_field_registry%get_field("p")
+    u => neko_registry%get_field("u")
+    v => neko_registry%get_field("v")
+    w => neko_registry%get_field("w")
+    p => neko_registry%get_field("p")
 
     coef => neko_user_access%case%fluid%c_Xh
    
@@ -65,9 +65,9 @@ contains
           
             ! Get solution fields (u,v,w) which contain the initial condition
             ! if we are at the first timestep 
-            ui => neko_field_registry%get_field("u")
-            vi => neko_field_registry%get_field("v")
-            wi => neko_field_registry%get_field("w")
+            ui => neko_registry%get_field("u")
+            vi => neko_registry%get_field("v")
+            wi => neko_registry%get_field("w")
             ! Pressure can be handled directly on GPU
             if (neko_bcknd_device .eq. 1) then
                call device_masked_copy_0(u%x_d, ui%x_d, bc%msk_d, u%dof%size(), bc%msk(0))
@@ -97,7 +97,7 @@ contains
        associate(p => fields%items(1)%ptr)
          
          if (time%tstep .eq. 1) then    
-            pi => neko_field_registry%get_field("p")
+            pi => neko_registry%get_field("p")
          
             ! Pressure can be handled directly on GPU
             if (neko_bcknd_device .eq. 1) then
