@@ -28,30 +28,16 @@ contains
     p => neko_registry%get_field("p")
 
     coef => neko_user_access%case%fluid%c_Xh
-<<<<<<< HEAD
 
     call fst_bc_driver_initialize(time%t,u,v,w,p,coef,neko_user_access%case%params)
 
   end subroutine initialize
  
 !> Set boundary conditions
-=======
-   
-    call fst_bc_driver_initialize(time%t,u,v,w,p,coef,neko_user_access%case%params) 
-
-  end subroutine initialize
-
-  !> Set boundary conditions
->>>>>>> ae0a0d0374d29a063cb7f3121bda071f84d5dfe0
   subroutine user_bc(fields, bc, time)
     type(field_list_t), intent(inout) :: fields
     type(field_dirichlet_t), intent(in) :: bc
     type(time_state_t), intent(in) :: time
-<<<<<<< HEAD
-
-=======
-    
->>>>>>> ae0a0d0374d29a063cb7f3121bda071f84d5dfe0
     type(field_t), pointer :: ui,vi,wi,pi
     type(coef_t)   , pointer :: coef
 
