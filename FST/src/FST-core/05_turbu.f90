@@ -29,6 +29,12 @@ contains
     call print_param("kstart", kstart)
     call print_param("kend", kend)
 
+
+    !
+    ! Search for the domain dimensions. 
+    ! WARNING: This should be restricted to the boundary only! Not the 
+    ! whole domain!
+    !
     dlx = glmax(coef%dof%x, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv) - &
           glmin(coef%dof%x, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv)
 
@@ -39,7 +45,8 @@ contains
           glmin(coef%dof%z, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv)
 
     if ( pe_rank.eq.0 ) then
-            
+      
+      ! Hardcoded seed for random # generation.This way the FST generated is always the same.  
       seed = -143        
 
       if (write_files) open(unit=137,form='formatted',file='bb.txt')
