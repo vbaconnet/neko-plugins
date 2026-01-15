@@ -102,6 +102,7 @@ module FST
      procedure, pass(this) :: free => FST_free_params
      ! =========================================================================
      procedure, pass(this) :: apply_baseflow => FST_apply_baseflow
+     procedure, pass(this) :: apply_baseflow_0 => FST_apply_baseflow_0
      ! =========================================================================
      ! ======== Generate FST
      procedure, pass(this) :: generate_common => FST_generate_common
@@ -463,7 +464,7 @@ contains
 
   !> Apply a specific baseflow in our region, from a boundary mask.
   !! If we specify v or w it takes the norm.
-  subroutine FST_apply_baseflow(this, mask, n, u, v, w)
+  subroutine FST_apply_baseflow_0(this, mask, n, u, v, w)
     class(FST_t), intent(inout) :: this
     type(field_t), intent(in) :: u, v, w
     integer, intent(in) :: mask(0:n)
@@ -491,9 +492,46 @@ contains
        call device_masked_gather_copy_0(this%v_baseflow_d, v%x_d, mask_d, u%dof%size(), n)
        call device_masked_gather_copy_0(this%w_baseflow_d, w%x_d, mask_d, u%dof%size(), n)
     else
-       call masked_gather_copy(this%u_baseflow, u%x, mask, u%dof%size(), n)
-       call masked_gather_copy(this%v_baseflow, v%x, mask, u%dof%size(), n)
-       call masked_gather_copy(this%w_baseflow, w%x, mask, u%dof%size(), n)
+       call masked_gather_copy_0(this%u_baseflow, u%x, mask, u%dof%size(), n)
+       call masked_gather_copy_0(this%v_baseflow, v%x, mask, u%dof%size(), n)
+       call masked_gather_copy_0(this%w_baseflow, w%x, mask, u%dof%size(), n)
+    end if
+         
+  end subroutine FST_apply_baseflow_0
+
+  !> Apply a specific baseflow in our region, from a boundary mask.
+  !! If we specify v or w it takes the norm.
+  subroutine FST_apply_baseflow(this, mask, n, u, v, w)
+    class(FST_t), intent(inout) :: this
+    type(field_t), intent(in) :: u, v, w
+    integer, intent(in) :: mask(n)
+    integer, intent(in) :: n
+
+    type(c_ptr) :: mask_d
+    integer :: i, idx
+
+    if (allocated(this%u_baseflow)) deallocate(this%u_baseflow)
+    if (allocated(this%v_baseflow)) deallocate(this%v_baseflow)
+    if (allocated(this%w_baseflow)) deallocate(this%w_baseflow)
+
+    allocate(this%u_baseflow(n))
+    allocate(this%v_baseflow(n))
+    allocate(this%w_baseflow(n))
+
+    if (neko_bcknd_device .eq. 1) then
+       call device_map(this%u_baseflow, this%u_baseflow_d, n)
+       call device_map(this%v_baseflow, this%v_baseflow_d, n)
+       call device_map(this%w_baseflow, this%w_baseflow_d, n)
+
+       mask_d = device_get_ptr(mask)
+
+       call device_masked_gather_copy_0(this%u_baseflow_d, u%x_d, mask_d, u%dof%size(), n)
+       call device_masked_gather_copy_0(this%v_baseflow_d, v%x_d, mask_d, u%dof%size(), n)
+       call device_masked_gather_copy_0(this%w_baseflow_d, w%x_d, mask_d, u%dof%size(), n)
+    else
+       call masked_gather_copy_0(this%u_baseflow, u%x, mask, u%dof%size(), n)
+       call masked_gather_copy_0(this%v_baseflow, v%x, mask, u%dof%size(), n)
+       call masked_gather_copy_0(this%w_baseflow, w%x, mask, u%dof%size(), n)
     end if
          
   end subroutine FST_apply_baseflow
@@ -605,12 +643,12 @@ contains
     !
     ! Apply baseflow in the bc zone
     !
-    call this%apply_baseflow(bc_mask, bc_mask(0), u, v, w)
+    call this%apply_baseflow_0(bc_mask, n, u, v, w)
 
     !
     ! Initialize the fringe in space
     !
-    allocate(this%fringe_space(bc_mask(0)))
+    allocate(this%fringe_space(n))
     do idx = 1, size(this%fringe_space)
 
        i = bc_mask(idx)
@@ -632,7 +670,7 @@ contains
     ! 
     allocate(this%phi_0(this%n_modes_total, bc_mask(0)))
 
-    do j = 1, bc_mask(0)
+    do j = 1, n
       x = coef%dof%x(bc_mask(j), 1,1,1)
       y = coef%dof%y(bc_mask(j), 1,1,1)
       z = coef%dof%z(bc_mask(j), 1,1,1)
@@ -664,8 +702,8 @@ contains
 !!$
     ! Copy everything to device and map with relevant device array pointers
     if (NEKO_BCKND_DEVICE .eq. 1) then
-       call device_map(this%fringe_space, this%fringe_space_d, bc_mask(0))
-       call device_memcpy(this%fringe_space, this%fringe_space_d, bc_mask(0), &
+       call device_map(this%fringe_space, this%fringe_space_d, n)
+       call device_memcpy(this%fringe_space, this%fringe_space_d, n, &
             HOST_TO_DEVICE, .false.)
 
        call device_map(this%phi_0, this%phi_0_d, this%n_modes_total*bc_mask(0))

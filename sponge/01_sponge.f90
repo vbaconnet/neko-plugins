@@ -40,12 +40,13 @@ module sponge
   use field_registry, only : neko_field_registry
   use field, only : field_t
   use global_interpolation, only: global_interpolation_t
+  use comm, only: pe_rank
   use json_utils, only : json_get, json_get_or_default
   use point_zone, only: point_zone_t
   use point_zone_registry, only: neko_point_zone_registry
   use fluid_user_source_term, only: fluid_user_source_term_t
-  use math, only: sub3, col2, copy
-  use device_math, only: device_sub3, device_col2, device_copy
+  use math, only: sub3, col2, copy, cmult
+  use device_math, only: device_sub3, device_col2, device_copy, device_cmult
   use utils, only: neko_error
   use logger, only: neko_log, LOG_SIZE, NEKO_LOG_DEBUG, NEKO_LOG_INFO, NEKO_LOG_VERBOSE
   use field_math, only: field_copy
@@ -56,6 +57,9 @@ module sponge
   use box_point_zone, only: box_point_zone_t
   use dofmap, only: dofmap_t
   use file, only: file_t
+  use field_list, only: field_list_t
+  use space, only: space_t, GLL
+  use interpolation, only: interpolator_t
   use fld_file_data, only: fld_file_data_t
   implicit none
   private
@@ -63,34 +67,23 @@ module sponge
   type, public :: sponge_t
 
      !> X velocity component.
-     type(field_t), pointer :: u
+     type(field_t), pointer :: u => null()
      !> Y velocity component.
-     type(field_t), pointer :: v
+     type(field_t), pointer :: v => null()
      !> Z velocity component.
-     type(field_t), pointer :: w
+     type(field_t), pointer :: w => null()
 
      !> Base flow components
-     type(field_t) :: u_bf
-     type(field_t) :: v_bf
-     type(field_t) :: w_bf
-!!$     type(vector_t) :: u_bf
-!!$     type(vector_t) :: v_bf
-!!$     type(vector_t) :: w_bf
+     type(field_t), pointer :: u_bf => null()
+     type(field_t), pointer :: v_bf => null()
+     type(field_t), pointer :: w_bf => null()
      logical :: baseflow_set = .false.
 
      !> Fringe array and parameters.
-!!$     type(vector_t) :: fringe
-     type(field_t) :: fringe
+     type(field_t), pointer :: fringe => null()
      real(kind=rp) :: alpha_in
-     real(kind=rp) :: amplitude
+     real(kind=rp) :: amplitudes(3)
      logical :: fringe_set = .false.
-
-     !> zone on which to apply the forcing
-!!$     character(len=1024), allocatable :: zone_names(:)
-
-!!$     !> Zone mask that is 0 indexed with the size at index 0
-!!$     integer, allocatable :: zone_mask_0(:)
-!!$     type(c_ptr) :: zone_mask_0_d = c_null_ptr
 
    contains
      !> Constructor from json, wrapping the actual constructor.
@@ -116,36 +109,48 @@ contains
   subroutine sponge_init_from_json(this, json)
     class(sponge_t), intent(inout) :: this
     type(json_file), intent(inout) :: json
-    real(kind=rp) :: alpha_in, amplitude
+    real(kind=rp) :: alpha_in
+    real(kind=rp), allocatable :: amplitudes(:)
 
     call json_get(json, "alpha", alpha_in)
-    call json_get(json, "amplitude", amplitude)
+    call json_get(json, "amplitudes", amplitudes)
 
-    call sponge_init_from_attributes(this, alpha_in, amplitude)
+    call sponge_init_from_attributes(this, alpha_in, amplitudes)
   end subroutine sponge_init_from_json
 
   !> Actual constructor.
-  subroutine sponge_init_from_attributes(this, alpha_in, amplitude)
+  subroutine sponge_init_from_attributes(this, alpha_in, amplitudes)
     class(sponge_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: alpha_in, amplitude
+    real(kind=rp), intent(in) :: alpha_in, amplitudes(:)
+
+    call this%free()
 
     this%alpha_in = alpha_in
-    this%amplitude = amplitude
+
+    this%amplitudes(1) = amplitudes(1)
+    this%amplitudes(2) = amplitudes(2)
+    this%amplitudes(3) = amplitudes(3)
+
+    if (pe_rank .eq. 0) write (*,*) "(SPONGE) Amplitudes", this%amplitudes
 
     call neko_log%message("Initializing sponge", lvl = NEKO_LOG_INFO)
 
     call neko_log%message("(SPONGE) Pointing at fields u,v,w", lvl = NEKO_LOG_INFO)
-    this%u => neko_field_registry%get_field_by_name("u")
-    this%v => neko_field_registry%get_field_by_name("v")
-    this%w => neko_field_registry%get_field_by_name("w")
+    this%u => neko_field_registry%get_field("u")
+    this%v => neko_field_registry%get_field("v")
+    this%w => neko_field_registry%get_field("w")
 
     call neko_log%message("(SPONGE) Initializing bf and fringe fields", lvl = NEKO_LOG_INFO)
-    call this%u_bf%init(this%u%dof, "sponge_u_bf")
-    call this%v_bf%init(this%u%dof, "sponge_v_bf")
-    call this%w_bf%init(this%u%dof, "sponge_w_bf")
-    call this%fringe%init(this%u%dof, "sponge_fringe")
-
-    this%fringe = 0.0_rp
+    call neko_field_registry%add_field(this%u%dof, "sponge_u_bf")
+    call neko_field_registry%add_field(this%u%dof, "sponge_v_bf")
+    call neko_field_registry%add_field(this%u%dof, "sponge_w_bf")
+    call neko_field_registry%add_field(this%u%dof, "sponge_fringe") 
+    this%u_bf => neko_field_registry%get_field("sponge_u_bf")
+    this%v_bf => neko_field_registry%get_field("sponge_v_bf")
+    this%w_bf => neko_field_registry%get_field("sponge_w_bf")
+    this%fringe => neko_field_registry%get_field("sponge_fringe")
+    
+    call neko_log%message("Done initializing sponge", lvl = NEKO_LOG_INFO)
 
   end subroutine sponge_init_from_attributes
 
@@ -161,6 +166,8 @@ contains
     type(file_t) :: f
     type(fld_file_data_t) :: fld
     integer :: sample_idx
+    type(space_t) :: prev_Xh
+    type(interpolator_t) :: space_interp
 
     call neko_log%message("(SPONGE) Assigning baseflow from file", lvl = NEKO_LOG_INFO)
     ! Extract idx from ".f00010"
@@ -173,46 +180,56 @@ contains
     call filename_chsuffix(raw_fname, fname, 'fld')
 
     ! Read field file
-    f = file_t(trim(fname))
+    call f%init(trim(fname))
     call fld%init
     call f%set_counter(sample_idx)
     call f%read(fld)
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call neko_log%message("(SPONGE) fld data copying to device" , lvl = NEKO_LOG_INFO)
+       call device_memcpy(fld%x%x, fld%x%x_d, fld%x%n, HOST_TO_DEVICE, .false.)
+       call device_memcpy(fld%y%x, fld%y%x_d, fld%y%n, HOST_TO_DEVICE, .false.)
+       call device_memcpy(fld%z%x, fld%z%x_d, fld%z%n, HOST_TO_DEVICE, .true.)
        call device_memcpy(fld%u%x, fld%u%x_d, fld%u%n, HOST_TO_DEVICE, .false.)
        call device_memcpy(fld%v%x, fld%v%x_d, fld%v%n, HOST_TO_DEVICE, .false.)
-       call device_memcpy(fld%w%x, fld%w%x_d, fld%w%n, HOST_TO_DEVICE, .false.)
+       call device_memcpy(fld%p%x, fld%p%x_d, fld%p%n, HOST_TO_DEVICE, .true.)
+       call device_memcpy(fld%w%x, fld%w%x_d, fld%w%n, HOST_TO_DEVICE, .true.)
     end if
 
     if (interpolate) then
 
        ! Generates an interpolator object and performs the point search
        call neko_log%message("(SPONGE) Generating global interpolator " // trim(fname), lvl = NEKO_LOG_INFO)
-       global_interp = fld%generate_interpolator(this%u%dof, this%u%msh, &
-            1d-6)
+       call fld%generate_interpolator(global_interp, this%u%dof, this%u%msh, &
+            0.000001_rp)
 
        ! Evaluate velocities and pressure
        call neko_log%message("(SPONGE) Interpolating " // trim(fname), lvl = NEKO_LOG_INFO)
-       call global_interp%evaluate(this%u_bf%x, fld%u%x, .false. )
-       call global_interp%evaluate(this%v_bf%x, fld%v%x, .false. )
-       call global_interp%evaluate(this%w_bf%x, fld%w%x, .false. )
+       call global_interp%evaluate(this%u_bf%x, fld%u%x , .false. )
+       call global_interp%evaluate(this%v_bf%x, fld%v%x , .false. )
+       call global_interp%evaluate(this%w_bf%x, fld%w%x , .false. )
 
        call global_interp%free
 
     else
 
-       if (NEKO_BCKND_DEVICE .eq. 1) then
-          call neko_log%message("(SPONGE) Copying fld data on gpu" // trim(fname), lvl = NEKO_LOG_INFO)
-          call device_copy(this%u_bf%x_d, fld%u%x_d, fld%u%n)
-          call device_copy(this%v_bf%x_d, fld%v%x_d, fld%v%n)
-          call device_copy(this%w_bf%x_d, fld%w%x_d, fld%w%n)
-       else
-          call neko_log%message("(SPONGE) Copying fld data on cpu" // trim(fname), lvl = NEKO_LOG_INFO)
-          call copy(this%u_bf%x, fld%u%x, fld%u%n)
-          call copy(this%v_bf%x, fld%v%x, fld%v%n)
-          call copy(this%w_bf%x, fld%w%x, fld%w%n)
-       end if
+       ! Build a space_t object from the data in the fld file
+       call prev_Xh%init(GLL, fld%lx, fld%ly, fld%lz)
+       call space_interp%init(this%u%Xh, prev_Xh)
+
+       ! Do the space-to-space interpolation
+       call space_interp%map(this%u_bf%x, fld%u%x, fld%nelv, this%u%Xh)
+       call space_interp%map(this%v_bf%x, fld%v%x, fld%nelv, this%v%Xh)
+       call space_interp%map(this%w_bf%x, fld%w%x, fld%nelv, this%w%Xh)
+
+       call space_interp%free
+ 
+       !if (NEKO_BCKND_DEVICE .eq. 1) then
+       !   call neko_log%message("(SPONGE) memcopying data on gpu", lvl = NEKO_LOG_INFO)
+       !   call device_memcpy(this%u_bf%x, this%u_bf%x_d, this%u_bf%size(), HOST_TO_DEVICE, .false.)
+       !   call device_memcpy(this%v_bf%x, this%v_bf%x_d, this%u_bf%size(), HOST_TO_DEVICE, .false.)
+       !   call device_memcpy(this%w_bf%x, this%w_bf%x_d, this%u_bf%size(), HOST_TO_DEVICE, .true.)
+       !end if
 
     end if
     
@@ -227,6 +244,10 @@ contains
     class(sponge_t), intent(inout) :: this
     type(field_t), intent(in) :: u,v,w
 
+    type(field_list_t) :: fld_list
+    type(file_t) :: f
+    !type(field_t), pointer :: us,vs,ws
+
     call neko_log%message("(SPONGE) Assigning baseflow", lvl = NEKO_LOG_INFO)
     call field_copy(this%u_bf, u)
     call field_copy(this%v_bf, v)
@@ -234,6 +255,23 @@ contains
     call neko_log%message("(SPONGE) done assigning baseflow", lvl = NEKO_LOG_INFO)
 
     this%baseflow_set = .true.
+
+    !call neko_log%message("Output BF to SPNG_BF.fld")
+    !f = file_t("SPNG_BF.fld")
+    !call fld_list%init(3)
+    !
+    !us => u 
+    !vs => v
+    !ws => w
+    !call fld_list%assign(1, us)
+    !call fld_list%assign(2, vs)
+    !call fld_list%assign(3, ws)
+    !call f%write(fld_list)
+    !call fld_list%free()
+    !call neko_log%message("... Done")
+    !nullify(us)
+    !nullify(vs)
+    !nullify(ws)
 
   end subroutine sponge_assign_baseflow_field
 
@@ -251,49 +289,44 @@ contains
   !     |      |          |
   !   xstart   xramp    xend
   ! Currently only supports box point zones
-  subroutine sponge_compute_fringe(this, zone_names, nzones)
+  subroutine sponge_compute_fringe(this, zone_name)
     class(sponge_t), intent(inout) :: this
-    integer, intent(in) :: nzones
-    character(len=*), intent(in) :: zone_names(nzones)
+    character(len=*), intent(in) :: zone_name
 
     !type(box_point_zone_t) :: b
     class(point_zone_t), pointer :: zone
-    integer :: i, n, izone, imask
-    real(kind=rp) :: x, dx, xramp
+    integer :: i, n, imask
+    real(kind=rp) :: x, dx
 
     call neko_log%message("(SPONGE) Computing fringe", lvl = NEKO_LOG_INFO)
-    do izone = 1, nzones
 
-       print *, trim(zone_names(izone))
-       zone => neko_point_zone_registry%get_point_zone(trim(zone_names(izone)))
-       call neko_log%message("(SPONGE) Fringing zone " // trim(zone%name), lvl = NEKO_LOG_INFO)
+    zone => neko_point_zone_registry%get_point_zone(trim(zone_name))
+    call neko_log%message("(SPONGE) Fringing zone " // trim(zone%name), lvl = NEKO_LOG_INFO)
+
        select type(b => zone)
        type is (box_point_zone_t)
 
           n = b%size
-          xramp = b%xmin + this%alpha_in * (b%xmax - b%xmin)
+          dx = this%alpha_in*(b%xmax - b%xmin)
 
           call neko_log%message("(SPONGE) doing ramp calculation", lvl = NEKO_LOG_INFO)
           do i = 1, b%size
              imask = b%mask(i)
              x = this%u%dof%x(imask, 1, 1, 1)
-             if (x .gt. b%xmin .and. x .lt. xramp) then
-                this%fringe%x(imask,1,1,1) = this%amplitude * (x - b%xmin) / (b%xmax - b%xmin)
-            else if (x .lt. b%xmax .and. x .ge. xramp) then
-               this%fringe%x(imask,1,1,1) = this%amplitude
-             end if
+
+             this%fringe%x(imask,1,1,1) = S((x - b%xmin)/dx)
+          
           end do
        call neko_log%message("(SPONGE) done fringing zone " // trim(zone%name), lvl = NEKO_LOG_INFO)
        class default
           call neko_error("Wrong point zone type")
        end select
-
-    end do
+    call neko_log%message("(SPONGE) done fringing zone " // trim(zone%name), lvl = NEKO_LOG_INFO)
 
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call neko_log%message("(SPONGE) fringe, copying to device" , lvl = NEKO_LOG_INFO)
        call device_memcpy(this%fringe%x, this%fringe%x_d, &
-            this%fringe%size(), HOST_TO_DEVICE, .true.)
+            this%fringe%size(), HOST_TO_DEVICE, .false.)
     end if
 
     this%fringe_set = .true.
@@ -304,18 +337,13 @@ contains
   subroutine sponge_free(this)
     class(sponge_t), intent(inout) :: this
 
-    call this%u_bf%free
-    call this%v_bf%free
-    call this%w_bf%free
-    call this%fringe%free
-
-!!$    if (allocated(this%zone_mask_0)) deallocate(this%zone_mask_0)
-!!$    if (c_associated(this%zone_mask_0_d)) call device_free(this%zone_mask_0_d)
-!!$
+    nullify(this%u_bf)
+    nullify(this%v_bf)
+    nullify(this%w_bf)
+    nullify(this%fringe)
     nullify(this%u)
     nullify(this%v)
     nullify(this%w)
-!!$    nullify(this%zone)
 
     this%fringe_set = .false.
     this%baseflow_set = .false.
@@ -325,11 +353,10 @@ contains
   !> Compute the sponge field.
   !! @param t The time value.
   !! @param tstep The current time-step
-  subroutine sponge_compute(this, f, t, tstep)
+  subroutine sponge_compute(this, f, t)
     class(sponge_t), intent(inout) :: this
     class(fluid_user_source_term_t), intent(inout) :: f
     real(kind=rp), intent(in) :: t
-    integer, intent(in) :: tstep
 
     if (.not. this%baseflow_set) call neko_error("SPONGE: No baseflow set")
     if (.not. this%fringe_set) call neko_error("SPONGE: No fringe set")
@@ -341,8 +368,13 @@ contains
        call device_sub3(f%w_d, this%w_bf%x_d, this%w%x_d, this%w%size())
 
        call device_col2(f%u_d, this%fringe%x_d, this%fringe%size())
+       call device_cmult(f%u_d, this%amplitudes(1), this%fringe%size())
+
        call device_col2(f%v_d, this%fringe%x_d, this%fringe%size())
+       call device_cmult(f%v_d, this%amplitudes(2), this%fringe%size())
+       
        call device_col2(f%w_d, this%fringe%x_d, this%fringe%size())
+       call device_cmult(f%w_d, this%amplitudes(3), this%fringe%size())
     else
        call neko_log%message("(SPONGE) Computing sponge host" , lvl = NEKO_LOG_INFO)
        call sub3(f%u, this%u_bf%x, this%u%x, this%u%size())
@@ -350,10 +382,27 @@ contains
        call sub3(f%w, this%w_bf%x, this%w%x, this%w%size())
 
        call col2(f%u, this%fringe%x, this%fringe%size())
+       call cmult(f%u, this%amplitudes(1), this%fringe%size())
        call col2(f%v, this%fringe%x, this%fringe%size())
+       call cmult(f%v, this%amplitudes(2), this%fringe%size())
        call col2(f%w, this%fringe%x, this%fringe%size())
+       call cmult(f%w, this%amplitudes(3), this%fringe%size())
     end if
 
   end subroutine sponge_compute
 
+  ! Smooth step function, 0 if x <= 0, 1 if x >= 1, 1/exp(1/(x-1) + 1/x) between 0 and 1
+  function S(x) result(y)
+    real(kind=rp), intent(in) :: x
+    real(kind=rp)             :: y
+
+    if ( x.le.0._rp ) then
+       y = 0._rp
+    else if ( x.ge.1._rp ) then
+       y = 1._rp
+    else
+       y = 1._rp / (1._rp + exp( 1._rp/(x-1._rp) + 1._rp/x))
+    end if
+
+  end function S
 end module sponge

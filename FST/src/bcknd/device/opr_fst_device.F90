@@ -84,6 +84,9 @@ contains
     integer :: n_mask, n_total_modes
     type(c_ptr) :: fs_d, ubf_d, vbf_d, wbf_d, phi_0_d, randvec_d, shell_d, &
          shell_amp_d, k_x_d, u_d, v_d, w_d, mask_d
+
+    if (n_mask .eq. 0) return ! safety to avoid kernel launch on 0-size array
+
 #ifdef HAVE_CUDA
     call cuda_fst(t, Uinf, u_d,v_d,w_d, mask_d,n_mask, &
             ubf_d, vbf_d, wbf_d, k_x_d, n_total_modes, phi_0_d, shell_d, &

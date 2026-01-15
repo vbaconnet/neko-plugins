@@ -114,8 +114,8 @@ module fst_bc_driver
        ystart  = ymin + delta_y
        yend    = ymax - delta_y 
     else
-       call json_get(params, "case.FST.ystart", ystart)
-       call json_get(params, "case.FST.yend", yend)
+       call json_get_or_default(params, "case.FST.ystart", ystart, ymin)
+       call json_get_or_default(params, "case.FST.yend", yend, ymax)
        delta_y = alpha*Ly
     end if
 
@@ -127,8 +127,8 @@ module fst_bc_driver
        zstart  = zmin + delta_z
        zend    = zmax - delta_z 
     else
-       call json_get(params, "case.FST.zstart", zstart)
-       call json_get(params, "case.FST.zend", zend)
+       call json_get_or_default(params, "case.FST.zstart", zstart, zmin)
+       call json_get_or_default(params, "case.FST.zend", zend, zmax)
        delta_z = alpha * Lz
     end if
     
@@ -177,6 +177,16 @@ module fst_bc_driver
     ! to do it yourself)
     call FST_obj%apply_BC(bc%msk, bc%msk(0), &
          t, u%x, v%x, w%x, angle, on_cpu)
+
+    ! If we compute on cpu, copy memory. This is slower!
+    if (NEKO_BCKND_DEVICE .eq. 1 .and. on_cpu) then
+        if (pe_rank .eq. 0) call neko_warning("You are computing FST on CPU")
+        if (pe_rank .eq. 0) call neko_warning("You are copying memory to GPU")
+        if (pe_rank .eq. 0) call neko_warning("This is very slow! Check on_host")
+        call device_memcpy(u%x, u%x_d, u%size(), HOST_TO_DEVICE, .false.)
+        call device_memcpy(v%x, v%x_d, v%size(), HOST_TO_DEVICE, .false.)
+        call device_memcpy(w%x, w%x_d, w%size(), HOST_TO_DEVICE, .false.)
+    end if
 
   end subroutine fst_bc_driver_apply
 

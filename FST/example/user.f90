@@ -3,7 +3,6 @@ module user
   use fst_bc_driver
   implicit none
 
-  character(len=LOG_SIZE) :: log_buf
 contains
 
 ! Register user defined functions (see user_intf.f90)
@@ -29,17 +28,30 @@ contains
     p => neko_registry%get_field("p")
 
     coef => neko_user_access%case%fluid%c_Xh
+<<<<<<< HEAD
 
     call fst_bc_driver_initialize(time%t,u,v,w,p,coef,neko_user_access%case%params)
 
   end subroutine initialize
  
 !> Set boundary conditions
+=======
+   
+    call fst_bc_driver_initialize(time%t,u,v,w,p,coef,neko_user_access%case%params) 
+
+  end subroutine initialize
+
+  !> Set boundary conditions
+>>>>>>> ae0a0d0374d29a063cb7f3121bda071f84d5dfe0
   subroutine user_bc(fields, bc, time)
     type(field_list_t), intent(inout) :: fields
     type(field_dirichlet_t), intent(in) :: bc
     type(time_state_t), intent(in) :: time
+<<<<<<< HEAD
 
+=======
+    
+>>>>>>> ae0a0d0374d29a063cb7f3121bda071f84d5dfe0
     type(field_t), pointer :: ui,vi,wi,pi
     type(coef_t)   , pointer :: coef
 
@@ -63,7 +75,7 @@ contains
          ! what has been applied in the initial condition
          !
          if (time%tstep .eq. 1) then
-
+         
             ! Get solution fields (u,v,w) which contain the initial condition
             ! if we are at the first timestep 
             ui => neko_registry%get_field("u")
@@ -79,9 +91,8 @@ contains
                call masked_copy_0(v%x, vi%x, bc%msk, v%dof%size(), bc%msk(0))
                call masked_copy_0(w%x, wi%x, bc%msk, w%dof%size(), bc%msk(0))
             end if
-
+         
          end if
-
 
          !
          ! Apply FST
@@ -118,7 +129,6 @@ contains
     end if
 
   end subroutine user_bc
-
 
   ! Free relevant objects 
   subroutine finalize(time)

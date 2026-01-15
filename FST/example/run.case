@@ -6,6 +6,7 @@
     "output_directory": "results",
     "output_at_end": true,
     "output_checkpoints": true,
+    "output_boundary": true,
     "checkpoint_control": "simulationtime",
     "checkpoint_value": 1.0,
     "runtime_statistics": {
@@ -25,7 +26,7 @@
 
     "FST": {
       "enabled": true, // !!! FST IS DISABLED !!
-      "t_start": 0.00,
+      "t_start": 0.3,
       "t_ramp": 0.001,
       "alpha": 0.15, // 15% distance to the y boundaries
       "periodic_z": true,
@@ -37,10 +38,8 @@
       "scheme": "pnpn",
       "Re": 3000,
       "initial_condition": {
-        "type": "field",
-        "file_name": "IC/field0.f00008",
-        "mesh_file_name": "IC/field0.f00000",
-        "interpolate": true
+        "type": "uniform",
+	"value": [1.0, 0.0, 0.0]
       },
       "velocity_solver": {
         "type": "cg",
@@ -61,7 +60,7 @@
         "max_iterations": 50
       },
       "output_control": "tsteps",
-      "output_value": 50,
+      "output_value": 100,
       "boundary_conditions": [
         {
         // inflow
