@@ -186,7 +186,7 @@ contains
     real(kind=xp), intent(in) :: t_end
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
 
-    call neko_log%section('Initializing FST (Forcing)')
+    call neko_log%section(' [FST] Initializing forcing')
 
     call this%init_common(xstart, xend,xstart,xend,x_delta_rise, x_delta_fall, ystart, &
          yend, ystart, yend, y_delta_rise, y_delta_fall, fringe_max, t_start, t_end, &
@@ -217,7 +217,7 @@ contains
     real(kind=xp), intent(in) :: t_end
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
 
-    call neko_log%section('Initializing FST (BC)')
+    call neko_log%section(' [FST] Initializing BC')
 
     call this%init_common(xmin, xmax, xstart, xend, x_delta_rise, &
             x_delta_fall, ymin, ymax, ystart, yend, y_delta_rise, &
@@ -247,6 +247,9 @@ contains
     character(len=1024) :: line
     character(len=20) :: keyword
     real(kind=xp) :: tmp
+    character(len=LOG_SIZE) :: log_buf
+
+    call neko_log%section(' [FST] Reading files')
 
     delimiter = ','
 
@@ -255,27 +258,28 @@ contains
        !
        ! Read sphere.dat to get number of spheres
        !
-       call neko_log%message("Reading sphere.dat")
+       call neko_log%message("[FST] Reading sphere.dat")
        open(file="sphere.dat", unit=unit, status="old", action="read", &
             iostat=ios)
        if (ios /= 0) then
-          call neko_error("Error opening sphere.dat")
+          call neko_error("[FST] Error opening sphere.dat")
        end if
 
        read(unit,*) line
        read(unit,*) keyword, this%nshells
-       print *, this%nshells
-
        close(unit)
+       
+       write (log_buf, '(A ,I4.4)') "[FST] # of shells:", this%nshells
+       call neko_log%message(log_buf)
 
        !
        ! Read FST spectrum, count # of lines to allocate all the arrays
        !
        open(file="fst_spectrum.csv", unit=unit, status="old", action="read", &
             iostat=ios)
-       write (*,*) "Reading fst_spectrum"
+       call neko_log%message("[FST] Reading fst_spectrum")
        if (ios /= 0) then
-          call neko_error("Error opening fst_spectrum.csv")
+          call neko_error("[FST] Error opening fst_spectrum.csv")
        end if
 
        num_columns = 1
@@ -306,10 +310,10 @@ contains
        !        AND different from the original implementation. Hence the
        !        extra verbose error message.
        if (num_columns .ne. 8) then
-          if (pe_rank .eq. 0) write (*,*) " ***ERROR READING fst_spectrum.csv***"
-          if (pe_rank .eq. 0) write (*,*) "fst_spectrum should have 8 cols."
-          if (pe_rank .eq. 0) write (*,*) "shell,kx,ky,kz,amp,u_hat_pn1,u_hat_pn2,u_hat_pn3"
-          call neko_error("fst_spectrum.csv should have 8 columns")
+          call neko_log%message("[FST] ***ERROR READING fst_spectrum.csv***")
+          call neko_log%message("[FST] fst_spectrum should have 8 cols.")
+          call neko_log%message("[FST] shell,kx,ky,kz,amp,u_hat_pn1,u_hat_pn2,u_hat_pn3")
+          call neko_error("[FST] fst_spectrum.csv should have 8 columns")
        end if
 
        ! NOTE: The total number of modes in the file can sometimes be
@@ -317,7 +321,10 @@ contains
        ! This is because some modes are removed in the process.
        this%n_modes_total = num_lines - 1 ! Remove the header
        np_eff = this%n_modes_total / this%nshells
-       print *, this%n_modes_total, np_eff
+       write (log_buf, '(A ,I5.5)') "[FST] Total # of modes:", this%n_modes_total
+       call neko_log%message(log_buf)
+       write (log_buf, '(A ,I5.5)') "[FST] Eff. # of points:", np_eff
+       call neko_log%message(log_buf)
 
     end if ! pe_rank .eq. 0
 
@@ -325,7 +332,6 @@ contains
     call MPI_Bcast(this%nshells, 1, MPI_INTEGER, 0, NEKO_COMM, ierr)
 
     call MPI_Barrier(NEKO_COMM, ierr)
-    print *, pe_rank, this%n_modes_total, this%nshells
 
     !
     ! Allocate all the relevant arrays:
@@ -347,7 +353,7 @@ contains
        open(file="fst_spectrum.csv", unit=unit, status="old", action="read", &
             iostat=ios)
        if (ios /= 0) then
-          call neko_error("Error opening fst_spectrum.csv")
+          call neko_error("[FST] Error opening fst_spectrum.csv")
        end if
 
        read(unit,*) line! read the header
@@ -369,9 +375,12 @@ contains
        ! Read the phase shifts in bb.txt
        !
        open(file="bb.txt", unit=unit, status="old", action="read", iostat=ios)
+       if (ios /= 0) then
+          call neko_error("[FST] Error opening bb.txt")
+       end if
+       
        do i = 1, this%n_modes_total
           read(unit,*) this%phase_shifts(i), tmp
-          !print *, this%phase_shifts(i)
        end do
 
     end if ! pe_rank .eq. 0
@@ -392,13 +401,7 @@ contains
          0, NEKO_COMM, ierr)
     call MPI_Barrier(NEKO_COMM, ierr)
 
-    !if (pe_rank .eq. 1) then
-    !   do i = 1, this%n_modes_total
-    !      !print *, "<<1>>", this%shell(i), this%k_x(i), this%k_y(i), this%k_z(i), &
-    !      !this%shell_amp((i-1)/78 +1), &
-    !      !     this%random_vectors(i,1), this%random_vectors(i,2), this%random_vectors(i,3)
-    !   end do
-    !end if
+    call neko_log%end_section('')
 
   end subroutine FST_read_from_files
 
@@ -429,35 +432,35 @@ contains
     
     if (pe_rank .ne. 0) return
 
-    write(log_buf, '(A ,F15.7)') "xstart      ", this%xstart
+    write(log_buf, '(A ,F15.7)') "[FST] xstart      ", this%xstart
     call neko_log%message(log_buf)
-    write(log_buf, '(A ,F15.7)') "xend        ", this%xend
+    write(log_buf, '(A ,F15.7)') "[FST] xend        ", this%xend
     call neko_log%message(log_buf)
-    write(log_buf, '(A ,F15.7)') "xmin        ", this%xmin
+    write(log_buf, '(A ,F15.7)') "[FST] xmin        ", this%xmin
     call neko_log%message(log_buf)
-    write(log_buf, '(A ,F15.7)') "xmax        ", this%xmax
+    write(log_buf, '(A ,F15.7)') "[FST] xmax        ", this%xmax
     call neko_log%message(log_buf)
-    write(log_buf, '(A ,F15.7)') "ystart      ", this%ystart
+    write(log_buf, '(A ,F15.7)') "[FST] ystart      ", this%ystart
     call neko_log%message(log_buf)
-    write(log_buf, '(A ,F15.7)') "yend        ", this%yend
+    write(log_buf, '(A ,F15.7)') "[FST] yend        ", this%yend
     call neko_log%message(log_buf)
-    write(log_buf, '(A ,F15.7)') "ymin        ", this%ymin
+    write(log_buf, '(A ,F15.7)') "[FST] ymin        ", this%ymin
     call neko_log%message(log_buf)
-    write(log_buf, '(A ,F15.7)') "ymax        ", this%ymax
+    write(log_buf, '(A ,F15.7)') "[FST] ymax        ", this%ymax
     call neko_log%message(log_buf)
-    write(log_buf, '(A ,F15.7)') "fringe_max  ", this%fringe_max
+    write(log_buf, '(A ,F15.7)') "[FST] fringe_max  ", this%fringe_max
     call neko_log%message(log_buf)
-    write(log_buf, '(A ,F15.7)') "x_delta_rise", this%x_delta_rise
+    write(log_buf, '(A ,F15.7)') "[FST] x_delta_rise", this%x_delta_rise
     call neko_log%message(log_buf)
-    write(log_buf, '(A ,F15.7)') "x_delta_fall", this%x_delta_fall
+    write(log_buf, '(A ,F15.7)') "[FST] x_delta_fall", this%x_delta_fall
     call neko_log%message(log_buf)
-    write(log_buf, '(A ,F15.7)') "y_delta_rise", this%y_delta_rise
+    write(log_buf, '(A ,F15.7)') "[FST] y_delta_rise", this%y_delta_rise
     call neko_log%message(log_buf)
-    write(log_buf, '(A ,F15.7)') "y_delta_fall", this%y_delta_fall
+    write(log_buf, '(A ,F15.7)') "[FST] y_delta_fall", this%y_delta_fall
     call neko_log%message(log_buf)
-    write(log_buf, '(A ,F15.7)') "t_start     ", this%t_start
+    write(log_buf, '(A ,F15.7)') "[FST] t_start     ", this%t_start
     call neko_log%message(log_buf)
-    write(log_buf, '(A ,F15.7)') "t_end       ", this%t_end
+    write(log_buf, '(A ,F15.7)') "[FST] t_end       ", this%t_end
     call neko_log%message(log_buf)
 
   end subroutine FST_print_params
@@ -546,9 +549,9 @@ contains
     !
     ! First, generate everything as usual
     !
-    call neko_log%section ('Generating FST')
+    call neko_log%section (' [FST] Generating')
     call make_turbu(coef, this%periodic_x, this%periodic_y, this%periodic_z)
-    call neko_log%end_section('Done --> Generating FST')
+    call neko_log%end_section('')
 
     !
     ! Next, use the arrays defined
@@ -620,7 +623,7 @@ contains
     else
 
        if (.not. present(Uinf)) then
-          call neko_error("Provide a value for Uinf if you init from file!")
+          call neko_error("[FST] Provide a value for Uinf if you init from file!")
        else 
           this%Uinf = Uinf
        end if
@@ -635,7 +638,7 @@ contains
     !
     ! Print some diagnostics just in case
     !
-    write (log_buf, '(A,F15.7)') "(FST) Uinf set to ", this%Uinf
+    write (log_buf, '(A,F15.7)') "[FST] Uinf set to ", this%Uinf
     call neko_log%message(log_buf)
 
 
