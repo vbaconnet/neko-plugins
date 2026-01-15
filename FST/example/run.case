@@ -13,7 +13,7 @@
       "enabled": false
     },
     "time": {
-      "end_time": 1.5,
+      "end_time": 0.3,
       "variable_timestep": true,
       "target_cfl": 0.5,
       "timestep": 1e-3,
@@ -27,9 +27,9 @@
 
     "FST": {
       "enabled": true, // !!! FST IS DISABLED !!
-      "t_start": 0.3,
+      "t_start": 0.05,
       "t_ramp": 0.001,
-      "alpha": 0.3, // 15% distance to the y boundaries
+      "alpha": 0.15, // 15% distance to the y boundaries
       "periodic_z": true
     },
 
