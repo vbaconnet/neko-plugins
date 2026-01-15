@@ -26,14 +26,14 @@
 
     "FST": {
       "enabled": true, // !!! FST IS DISABLED !!
-      "t_start": 0.1,
+      "t_start": 0.05,
       "t_ramp": 0.001,
       "alpha": 0.15, // 15% distance to the y boundaries
       "periodic_z": true,
       "ystart": -0.1,
       "yend": 0.1,
       "regen_files": false,
-      "Uinf": 2.0
+      "Uinf": 1.0
     },
 
     "fluid": {
