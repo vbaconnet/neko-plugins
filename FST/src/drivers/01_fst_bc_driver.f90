@@ -18,7 +18,15 @@ module fst_bc_driver
   character(len=LOG_SIZE) :: LOG_BUF
   ! ============================================================================
 
+  ! Whether or not FST is enabled
   logical :: ENABLED
+
+  ! Whether or not to generate the FST wavenumbers etc from scratch or to 
+  ! read from the files bb.txt, sphere.dat, fst_spectrum.csv
+  logical :: REGEN
+
+  ! Free-stream velocity (this is only populated if REGEN is true
+  real(kind=xp) :: UINF
 
   !
   ! For outputting the forcing as a field file
@@ -136,6 +144,10 @@ module fst_bc_driver
     call json_get(params, "case.FST.t_ramp", t_ramp)
     call json_get_or_default(params, "case.FST.t_start", t_start, 0.0_xp)
 
+    ! Read options for generating FST from scratch or not
+    call json_get(params, "case.FST.regen_files", REGEN)
+    if (.not. REGEN) call json_get(params, "case.FST.Uinf", UINF)
+    
     ! Initialize the fst parameters
     call FST_OBJ%init_bc(zmin, zmax, zstart, zend, &
             delta_z, delta_z, &
@@ -146,8 +158,7 @@ module fst_bc_driver
 
   end subroutine fst_bc_driver_initialize
 
-  subroutine fst_bc_driver_apply(u, v, w, bc, coef, t, tstep, angle, on_cpu, &
-       regen, Uinf)
+  subroutine fst_bc_driver_apply(u, v, w, bc, coef, t, tstep, angle, on_cpu)
     type(field_t), intent(inout) :: u
     type(field_t), intent(inout) :: v
     type(field_t), intent(inout) :: w
@@ -156,8 +167,7 @@ module fst_bc_driver
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
     real(kind=xp), intent(in) :: angle
-    logical, intent(in) :: on_cpu, regen
-    real(kind=xp), optional :: Uinf
+    logical, intent(in) :: on_cpu
 
     integer :: i, idx
 
@@ -168,7 +178,7 @@ module fst_bc_driver
     ! on the boundry mask!
     !
     if (tstep .eq. 1) then
-       call FST_obj%generate_bc(coef, bc%msk, bc%msk(0), u, v, w, regen, Uinf)
+       call FST_obj%generate_bc(coef, bc%msk, bc%msk(0), u, v, w, REGEN, UINF)
     end if
 
     ! Then, apply the free stream turbulence that will add on
