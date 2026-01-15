@@ -14,7 +14,7 @@
     },
     "time": {
       "end_time": 0.3,
-      "variable_timestep": true,
+      "variable_timestep": false,
       "target_cfl": 0.5,
       "timestep": 1e-3,
       "max_timestep": 0.25e-2
