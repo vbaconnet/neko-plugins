@@ -85,10 +85,8 @@ contains
          !
          coef => neko_user_access%case%fluid%c_Xh
          call fst_bc_driver_apply(u, v, w, bc, coef, time%t, time%tstep, &
-                 0.0_xp, &                   ! Angle in the x-y direction
-                 NEKO_BCKND_DEVICE .ne. 1, & ! Wether to do FST on CPU
-                 regen = .false., &                   ! Wether to regen FST files
-                 Uinf = 2.0_xp)                     ! Uinf (only if regen = .true.)
+                 0.0_xp, & ! Angle in the x-y direction
+                 .false.)  ! Wether to do FST on CPU
                  
        end associate
 
