@@ -44,7 +44,7 @@ contains
     real(kind=rp), intent(in) :: value
     character(len=LOG_SIZE) :: log_buf
 
-    write(log_buf, *) name, ": ", value
+    write(log_buf, *) "[FST] ", name, ": ", value
     call neko_log%message(log_buf)
 
   end subroutine print_param
@@ -57,7 +57,7 @@ contains
     integer, intent(in) :: value
     character(len=LOG_SIZE) :: log_buf
 
-    write(log_buf, *) name, ": ", value
+    write(log_buf, *) "[FST] ", name, ": ", value
     call neko_log%message(log_buf)
 
   end subroutine print_int

@@ -87,7 +87,7 @@ contains
       tke_tot1 = tke_tot1 + ek(kstart + i*dkint, fst_il, 1._rp)
     end do
     tke_tot1 = tke_tot1*dkint
-    call print_param('FST - integrated energy in spectrum ',tke_tot1)
+    call print_param('integrated energy in spectrum ',tke_tot1)
     ! ------------------------------------------------------------------------
 
     ! ----- integrate the energy spectrum with nshells points ----------------
@@ -97,7 +97,7 @@ contains
       tke_tot = tke_tot + ek(kstart + (i-1)*dkint,fst_il,1._rp)
     end do
     tke_tot = tke_tot*dkint
-    write (log_buf, *) 'FST - discretized on ', nshells, ' shells :' , tke_tot
+    write (log_buf, *) '[FST] discretized on ', nshells, ' shells :' , tke_tot
     call neko_log%message(log_buf)
     ! -------------------------------------------------------------------------
 
@@ -223,9 +223,9 @@ contains
       end do          ! j=1,2*Np
     end do            ! i=1,nshells
     ! write(6,*) 'FST - (0,0,0) wavenumber removed'
-    call neko_log%message('FST - (0,0,0) wavenumber removed')
+    call neko_log%message('[FST] (0,0,0) wavenumber removed')
 
-    write(log_buf, *) 'Saved ',z1,' of ',z1+z2, ' fst modes.'
+    write(log_buf, *) '[FST] Saved ',z1,' of ',z1+z2, ' fst modes.'
     call neko_log%message(log_buf)
     !      close(12)
 
@@ -293,16 +293,16 @@ contains
 
     !      close(11)
 
-    write (log_buf, *) 'FST - ',k_length,'wavenumbers generated'
+    write (log_buf, *) '[FST]', k_length, 'wavenumbers generated'
     call neko_log%message(log_buf)
     ! 2012 format(A7,1x,i5,1x,A21)
 
-    call print_param('FST - Largest wavelength in x',  2.0*pi/kxmin)
-    call print_param('FST - Smallest wavelength in x', 2.0*pi/kxmax)
-    call print_param('FST - Largest wavelength in y',  2.0*pi/kymin)
-    call print_param('FST - Smallest wavelength in y', 2.0*pi/kymax)
-    call print_param('FST - Largest wavelength in z',  2.0*pi/kzmin)
-    call print_param('FST - Smallest wavelength in z', 2.0*pi/kzmax)
+    call print_param('Largest wavelength in x',  2.0*pi/kxmin)
+    call print_param('Smallest wavelength in x', 2.0*pi/kxmax)
+    call print_param('Largest wavelength in y',  2.0*pi/kymin)
+    call print_param('Smallest wavelength in y', 2.0*pi/kymax)
+    call print_param('Largest wavelength in z',  2.0*pi/kzmin)
+    call print_param('Smallest wavelength in z', 2.0*pi/kzmax)
 
     ! write(6,2015) 'FST - Largest wavelength in x',  2.0*pi/kxmin! ,kxmin
     ! write(6,2016) 'FST - Smallest wavelength in x', 2.0*pi/kxmax! ,kxmax

@@ -65,7 +65,7 @@ contains
 
       if (write_files) close(137)
       ! write(6,*) 'FST - Random amplitude generated'
-      call neko_log%message("FST - Random amplitude generated")
+      call neko_log%message("[FST] Random amplitude generated")
       
       !     make sure that continuity is enforced by ensuring u_vec.k_vec=(0 0 0)
       do i=1,k_length
@@ -92,7 +92,7 @@ contains
          enddo
       enddo
 
-      call neko_log%message('FST - Amplitudes projection done')
+      call neko_log%message('[FST] Amplitudes projection done')
 
       !           Check energy in individual modes
       ue=0.
@@ -122,16 +122,16 @@ contains
       
       if (write_files) close(13)
       
-      write(log_buf,'(A18,10x,E12.5E2)') 'FST - Energy in u',ue 
+      write(log_buf,'(A18,10x,E12.5E2)') '[FST] Energy in u',ue 
       call neko_log%message(log_buf)      
-      write(log_buf,'(A18,10x,E12.5E2)') 'FST - Energy in v',ve 
+      write(log_buf,'(A18,10x,E12.5E2)') '[FST] Energy in v',ve 
       call neko_log%message(log_buf)      
-      write(log_buf,'(A18,10x,E12.5E2)') 'FST - Energy in w',we 
+      write(log_buf,'(A18,10x,E12.5E2)') '[FST] Energy in w',we 
       call neko_log%message(log_buf)      
-      write(log_buf,'(A20,8x,E12.5E2)') 'FST - Estimated tke', &
+      write(log_buf,'(A20,8x,E12.5E2)') '[FST] Estimated tke', &
                                     (ue+ve+we)/2.
       call neko_log%message(log_buf)                                    
-      write(log_buf,'(A24,9x,E12.5E2)') 'FST - Estimated Tu*U_inf', &
+      write(log_buf,'(A24,9x,E12.5E2)') '[FST] Estimated Tu*U_inf', &
       sqrt((ue+ve+we)/3.)
       call neko_log%message(log_buf)                                  
     
