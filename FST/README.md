@@ -28,11 +28,42 @@ The driver module uses some parameters that should be given in the case file. Be
       "t_start": 0.0001, // Time at which to start applying FST
       "t_ramp": 0.001,   // Length of the linear ramp in time
       "alpha": 0.2,      // see below for full explanation of what this is
-      "ystart": -0.01,  // Lower bound for the fringe function (Also exists for z, if y is periodic)
-      "yend": 0.01,     // High bound for the fringe function  (Also exists for z, if y is periodic)
-      "periodic_z": true // Self-explanatory. If periodic in y add "periodic_y": true
+      "ystart": -0.01,   // Lower bound for the fringe function (Also exists for z, if y is periodic)
+      "yend": 0.01,      // High bound for the fringe function  (Also exists for z, if y is periodic)
+      "periodic_z": true, // Self-explanatory. If periodic in y add "periodic_y": true
+      "regen_files": true, // Set to true to generate wavenumbers etc. See below for further explanation
+      "Uinf": 1.0,       // Free-stream velocity. Only read if "regen_files" is false.
 }
 ```
+
+### FST generation
+
+In the original implementation, FST wavenumbers and amplitudes are generated
+on-the-fly at the beginning of the simulation. This is the default behavior in
+the present implementation. Generating wavenumbers/amplitudes on-the-fly will
+create three separate files:
+- `bb.txt`, which contains the random phases,
+- `fst_spectrum.csv`, which contains wavenumbers, amplitudes and the random,
+  unitary, divergence-free vectors, and
+- `sphere.dat`, which contains information about # shells, points per shell,
+  and wavenumber discretization parameters.
+
+You also have the possibility to reuse previously generated files to keep
+the same FST parameters across two simulations. To do that, use the parameter
+`FST.regen_files` and set it to `false`. Be careful that the 3 files mentioned
+above must be present in the same folder as your executable. 
+
+The format of the fst_spectrum.csv file is a bit special and differs
+from previous implementations. This version of the code requires it to have 8
+columns, which are as follows:
+
+```.csv
+ShellNo,kx,ky,kz,amp,u_hat_pn1,u_hat_pn2,u_hat_pn3
+```
+
+If `regen_files` is `false`, you must also specify the free-stream velocity
+since nothing from `01_global_params.f90` will be used. This can be done via
+the parameters `FST.Uinf`.
 
 ### Spatial fringe parameters
 
