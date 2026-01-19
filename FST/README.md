@@ -49,14 +49,22 @@ $$
 \lambda_u = S\left( \frac{u - u_{start}}{\delta_{u,rise}}\right) - S\left( \frac{u - u_{end}}{\delta_{u,fall}}+1\right)
 $$
 
-![An example of fringe function with different alphas](fringe.png "Example of fringe function")
-![A practical example of an inlet boundary](fst.png "Example of z-component of FST on an inlet boundary")
-
 Note that $\lambda_u = 1$ if the direction `u` is set to be periodic.
 
-`_start` and `_end` parameters need to be set by the user. 
-By default, and only if the direction is not periodic, `_start` will be set to the minimum coordinate on the boundary (in that direction). 
-The same goes for `_end`, it will be by default set to the maximum value.
+
+Below is an example of fringe function in 1 dimension.
+![An example of fringe function with different alphas](fringe.png "Example of fringe function")
+
+And here is an example of how it looks like on an inlet boundary. In this case, we are showing
+the z-component of velocity where the baseflow has 0 velocity. The z-direction is set to be 
+periodic and therefore there is no smoothing along the z-direction. The y-direction is not 
+periodic. We have exaggerated the extents of the fringe function to make it obvious, but
+this will very much be case dependent.
+![A practical example of an inlet boundary](fst.png "Example of z-component of FST on an inlet boundary")
+
+The `_start` and `_end` parameters can be set by the user. By default, and only if the direction is not 
+periodic, `_start`/`_end` will be set to the minimum/maximum coordinate on the boundary (in that direction). 
+
 The quantities $\delta_{u,*}$ are computed as a percentage $\alpha$ of the total boundary length 
 in the direction `u`: $\delta_{u,rise} = \delta_{u,fall} = \alpha * L_u$, where 
 $L_u$ is the total domain length at the inlet in the direction u. 
