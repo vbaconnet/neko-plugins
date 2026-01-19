@@ -49,6 +49,8 @@ $$
 \lambda_u = S\left( \frac{u - u_{start}}{\delta_{u,rise}}\right) - S\left( \frac{u - u_{end}}{\delta_{u,fall}}+1\right)
 $$
 
+![An example of fringe functions with different alphas](fringe.png "Example of fringe function")
+
 Note that $\lambda_u = 1$ if the direction `u` is set to be periodic.
 
 `_start` and `_end` parameters need to be set by the user. 
