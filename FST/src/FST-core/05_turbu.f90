@@ -29,7 +29,6 @@ integer, intent(inout) :: seed
     character(len=LOG_SIZE) :: log_buf
 
     if (present(gdim)) gdim_ = gdim
-    character(len=LOG_SIZE) :: log_buf
 
     call print_param("nshells", real(nshells, kind=rp))
     call print_param("Npmax", real(Npmax, kind=rp))
@@ -38,20 +37,40 @@ integer, intent(inout) :: seed
     call print_param("kstart", kstart)
     call print_param("kend", kend)
 
+    if (.not. present(coef)) then
+      if (.not. (present(dx) .and. present(dy) .and. present(dz))) then
+        call neko_error("Please specify either coef or dx,dy,dz")
+      end if
+    end if
 
-    !
-    ! Search for the domain dimensions. 
-    ! WARNING: This should be restricted to the boundary only! Not the 
-    ! whole domain!
-    !
+    if (present(dx)) then
+      dlx = dx
+    else 
     dlx = glmax(coef%dof%x, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv) - &
           glmin(coef%dof%x, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv)
+    end if
 
+    if (present(dy)) then
+      dly = dy
+    else 
     dly = glmax(coef%dof%y, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv) - &
           glmin(coef%dof%y, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv)
+    end if
 
+    if (present(dz)) then
+      dlz = dz
+    else 
     dlz = glmax(coef%dof%z, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv) - &
           glmin(coef%dof%z, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv)
+    end if
+ 
+    write (log_buf, *) "[FST] Length in x: ", dlx
+    call neko_log%message(log_buf)
+    write (log_buf, *) "[FST] Length in y: ", dly
+    call neko_log%message(log_buf)
+    write (log_buf, *) "[FST] Length in z: ", dlz
+    call neko_log%message(log_buf)
+
 
     if ( pe_rank.eq.0 ) then
       
