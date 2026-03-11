@@ -12,7 +12,7 @@ contains
   subroutine make_turbu(periodic_x, periodic_y, periodic_z, seed, &
                         write_file_path, dx, dy, dz, gdim, coef)
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
-integer, intent(inout) :: seed
+    integer, intent(inout) :: seed
     character(len=*), intent(in) :: write_file_path
     real(kind=rp), intent(in), optional :: dx, dy, dz
     integer, intent(in), optional :: gdim 
@@ -46,22 +46,22 @@ integer, intent(inout) :: seed
     if (present(dx)) then
       dlx = dx
     else 
-    dlx = glmax(coef%dof%x, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv) - &
-          glmin(coef%dof%x, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv)
+      dlx = glmax(coef%dof%x, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv) - &
+            glmin(coef%dof%x, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv)
     end if
 
     if (present(dy)) then
       dly = dy
     else 
-    dly = glmax(coef%dof%y, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv) - &
-          glmin(coef%dof%y, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv)
+      dly = glmax(coef%dof%y, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv) - &
+            glmin(coef%dof%y, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv)
     end if
 
     if (present(dz)) then
       dlz = dz
     else 
-    dlz = glmax(coef%dof%z, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv) - &
-          glmin(coef%dof%z, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv)
+      dlz = glmax(coef%dof%z, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv) - &
+            glmin(coef%dof%z, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv)
     end if
  
     write (log_buf, *) "[FST] Length in x: ", dlx
