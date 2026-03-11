@@ -20,11 +20,15 @@ integer, intent(inout) :: seed
 
     integer :: k,i,j
     integer :: shellno
+    integer :: gdim_ = 3
     !integer :: seed
     real(kind=rp) :: ue,ve,we
     real(kind=rp) :: uamp,vamp,wamp
     real(kind=rp) :: amp, bb1(fst_modes, 3), dlx, dly, dlz
     real(kind=rp) :: u_hat(fst_modes, 3), u_hat_p(fst_modes, 3)
+    character(len=LOG_SIZE) :: log_buf
+
+    if (present(gdim)) gdim_ = gdim
     character(len=LOG_SIZE) :: log_buf
 
     call print_param("nshells", real(nshells, kind=rp))
@@ -60,7 +64,7 @@ integer, intent(inout) :: seed
       call spec_s(dlx, dly, dlz, periodic_x, periodic_y, periodic_z, seed, &
               write_file_path) ! get isotropically distributed wavenumbers in spheres
 
-      do k=1,coef%msh%gdim
+      do k=1,gdim_
         do i=1,fst_modes
 
                 bb(i,k) = ran2(seed)*2.0*pi        ! random phase shift
@@ -77,11 +81,11 @@ integer, intent(inout) :: seed
       
       !     make sure that continuity is enforced by ensuring u_vec.k_vec=(0 0 0)
       do i=1,k_length
-         do j= 1,coef%msh%gdim
+         do j= 1,gdim_
             u_hat(i,j)=bb1(i,j)
          enddo
 
-         do j=1,coef%msh%gdim
+         do j=1,gdim_
             u_hat_p(i,j) = u_hat(i,j) &
                  - (u_hat(i,1)*k_num_all(i,1) &
                  + u_hat(i,2)*k_num_all(i,2) &
@@ -92,7 +96,7 @@ integer, intent(inout) :: seed
                  +  k_num_all(i,3)**2)
          enddo
 
-         do j=1,coef%msh%gdim
+         do j=1,gdim_
             u_hat_pn(i,j) = u_hat_p(i,j) &
                  / sqrt(u_hat_p(i,1)**2 &
                  + u_hat_p(i,2)**2 &
