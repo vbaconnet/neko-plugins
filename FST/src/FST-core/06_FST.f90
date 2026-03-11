@@ -92,6 +92,11 @@ module FST
      type(c_ptr) :: k_x_d = C_NULL_PTR
      real(kind=xp), allocatable :: phase_shifts(:)
 
+     !> Indicates whether the FST has been generated
+     logical :: is_generated = .false.
+
+     integer :: seed !< Seed for random number generation
+
    contains
 
      ! ======== Init/Free procedures
@@ -124,7 +129,7 @@ contains
        ymin, ymax, ystart, yend, y_delta_rise, y_delta_fall, &
        fringe_max, &
        t_start, t_end, &
-       periodic_x, periodic_y, periodic_z)
+       periodic_x, periodic_y, periodic_z, seed)
     class(FST_t), intent(inout) :: this
     real(kind=rp), intent(in) :: xstart, xend, xmin, xmax
     real(kind=rp), intent(in) :: ystart, yend, ymin, ymax
@@ -136,6 +141,10 @@ contains
     real(kind=xp), intent(in) :: t_start
     real(kind=xp), intent(in) :: t_end
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
+    integer, intent(inout), optional :: seed
+
+    integer :: seed_ = -143
+    if (present(seed)) seed_ = seed
 
     this%periodic_x = periodic_x
     this%periodic_y = periodic_y
@@ -238,13 +247,15 @@ contains
   !!
   !! NOTE: The structure of fst_spectrum.csv should be:
   !!  shellno, kx, ky, kz, amp, u_hat_pn(1), u_hat_pn(2), u_hat_pn(3)
-  subroutine FST_read_from_files(this)
+  subroutine FST_read_from_files(this, path)
     class(FST_t), intent(inout) :: this
+    character(len=*), intent(in) :: path
 
     integer :: unit, ios, num_columns, num_lines, n_modes_total, i, np_eff, &
          ierr, prev_shell, idx_shell_amp
     character(len=1) :: delimiter
     character(len=1024) :: line
+    character(len=2048) :: fpath
     character(len=20) :: keyword
     real(kind=xp) :: tmp
     character(len=LOG_SIZE) :: log_buf
@@ -258,11 +269,13 @@ contains
        !
        ! Read sphere.dat to get number of spheres
        !
-       call neko_log%message("[FST] Reading sphere.dat")
-       open(file="sphere.dat", unit=unit, status="old", action="read", &
-            iostat=ios)
+       fpath = trim(path) // "/sphere.dat"
+       call neko_log%message("[FST] Reading " // trim(fpath))
+       open(file = trim(fpath), unit = unit, status = "old", &
+            action="read", iostat=ios)
+
        if (ios /= 0) then
-          call neko_error("[FST] Error opening sphere.dat")
+          call neko_error("[FST] Error opening " // trim(fpath))
        end if
 
        read(unit,*) line
@@ -275,11 +288,12 @@ contains
        !
        ! Read FST spectrum, count # of lines to allocate all the arrays
        !
-       open(file="fst_spectrum.csv", unit=unit, status="old", action="read", &
+       fpath = trim(path) // "/fst_spectrum.csv"
+       open(file=trim(fpath), unit=unit, status="old", action="read", &
             iostat=ios)
-       call neko_log%message("[FST] Reading fst_spectrum")
+       call neko_log%message("[FST] Reading " // trim(fpath))
        if (ios /= 0) then
-          call neko_error("[FST] Error opening fst_spectrum.csv")
+          call neko_error("[FST] Error opening " // trim(fpath))
        end if
 
        num_columns = 1
@@ -350,10 +364,10 @@ contains
        !
        ! Now read fst_spectrum again and populate all the arrays
        !
-       open(file="fst_spectrum.csv", unit=unit, status="old", action="read", &
+       open(file=trim(fpath), unit=unit, status="old", action="read", &
             iostat=ios)
        if (ios /= 0) then
-          call neko_error("[FST] Error opening fst_spectrum.csv")
+          call neko_error("[FST] Error opening " // trim(fpath))
        end if
 
        read(unit,*) line! read the header
@@ -374,9 +388,10 @@ contains
        !
        ! Read the phase shifts in bb.txt
        !
-       open(file="bb.txt", unit=unit, status="old", action="read", iostat=ios)
+       fpath = trim(path) // "/bb.txt"
+       open(file=trim(fpath), unit=unit, status="old", action="read", iostat=ios)
        if (ios /= 0) then
-          call neko_error("[FST] Error opening bb.txt")
+          call neko_error("[FST] Error opening " // trim(fpath))
        end if
        
        do i = 1, this%n_modes_total
@@ -405,7 +420,6 @@ contains
 
   end subroutine FST_read_from_files
 
-
   !! Free parameters in global params
   subroutine FST_free_params(this)
     class(FST_t), intent(inout) :: this
@@ -431,7 +445,6 @@ contains
     character(len=LOG_SIZE) :: log_buf
     
     if (pe_rank .ne. 0) return
-
     write(log_buf, '(A ,F15.7)') "[FST] xstart      ", this%xstart
     call neko_log%message(log_buf)
     write(log_buf, '(A ,F15.7)') "[FST] xend        ", this%xend
@@ -462,7 +475,8 @@ contains
     call neko_log%message(log_buf)
     write(log_buf, '(A ,F15.7)') "[FST] t_end       ", this%t_end
     call neko_log%message(log_buf)
-
+    write(log_buf, '(A ,I0)')    "[FST] seed        ", this%seed
+    call neko_log%message(log_buf)
   end subroutine FST_print_params
 
   !> Apply a specific baseflow in our region, from a boundary mask.
@@ -540,9 +554,10 @@ contains
   end subroutine FST_apply_baseflow
 
   !> Common function for generation
-  subroutine FST_generate_common(this, coef)
+  subroutine FST_generate_common(this, coef, path)
     class(FST_t), intent(inout) :: this
     type(coef_t), intent(in) :: coef
+    character(len=*), intent(in) :: path
 
     integer :: ierr
 
@@ -550,7 +565,8 @@ contains
     ! First, generate everything as usual
     !
     call neko_log%section (' [FST] Generating')
-    call make_turbu(coef, this%periodic_x, this%periodic_y, this%periodic_z)
+    call make_turbu(this%periodic_x, this%periodic_y, this%periodic_z, &
+                    this%seed, path, coef=coef)
     call neko_log%end_section('')
 
     !
@@ -558,7 +574,7 @@ contains
 
   end subroutine FST_generate_common
 
-  !> Generate FST for forcing
+  !> Generate FST for forcing (empty)
   subroutine FST_generate_forcing(this, coef, zone, u, v, w)
     class(FST_t), intent(inout) :: this
     type(coef_t), intent(in) :: coef
@@ -598,26 +614,25 @@ contains
   end subroutine FST_generate_forcing
 
   !> Do the generation for BC.
-  subroutine FST_generate_bc(this, coef, bc_mask, n, u, v, w, regen, Uinf)
+  subroutine FST_generate_bc(this, coef, bc_mask, n, u, v, w, regen, Uinf, path)
     class(FST_t), intent(inout) :: this
     type(coef_t), intent(in) :: coef
     integer, intent(in) :: bc_mask(0:n)
     integer, intent(in) :: n
     type(field_t), intent(in) :: u, v, w
     logical, intent(in) :: regen
-    real(kind=xp), optional :: Uinf
+    character(len=*), intent(in) :: path
+    real(kind=xp), intent(in), optional :: Uinf
 
     character(len=LOG_SIZE) :: log_buf
     real(kind=rp) :: x, y, z
     integer :: ierr, i, idx, m, j
     
-    !
-    ! Generate everything from scratch. This will create the files
-    ! bb.txt, sphere.dat and fst_spectrum.csv
-    !
     if (regen) then
 
-       call this%generate_common(coef)
+      ! Generate everything from scratch. This will create the files
+      ! bb.txt, sphere.dat and fst_spectrum.csv
+       call this%generate_common(coef, path)
        this%Uinf = glb_uinf
 
     else
@@ -633,7 +648,7 @@ contains
     !
     ! Read data from files (will not use anything from global_params!)
     !
-    call this%read_from_files()
+    call this%read_from_files(path)
 
     !
     ! Print some diagnostics just in case
@@ -822,54 +837,6 @@ contains
        this%u_baseflow, this%v_baseflow, this%w_baseflow, &
        this%k_x, this%n_modes_total, this%phi_0, this%shell, this%shell_amp, &
        this%random_vectors, angleXY, fringe_time, this%fringe_space, on_host)
-
-!!$    phi_t = glb_uinf*t
-!!$    ! Loop on all points in the point zone
-!!$    do idx = 1, bc_mask(0)
-!!$
-!!$       i = bc_mask(idx)
-!!$
-!!$       !> This vector will contain the sum of all Fourier modes
-!!$       rand_vec = 0.0_rp
-!!$
-!!$       ! Sum all sin modes for each gll point
-!!$       do m = 1, this%n_modes_total
-!!$
-!!$          ! Random phase shifts
-!!$          !phase_shft = bb(m,1)
-!!$
-!!$          ! k_x(x - U*t) + ky*y + kz*z + phi
-!!$          ! = k_x*x + ky*y + kz*z - k_x*U*t + phi
-!!$          !phi = k_num_all(m,1) * (x(i,1,1,1) - glb_uinf*t) + &
-!!$          !     k_num_all(m,2) *  y(i,1,1,1) + &
-!!$          !     k_num_all(m,3) *  z(i,1,1,1) + &
-!!$          !     phase_shft
-!!$
-!!$          phi = this%phi_0(m,idx) - this%k_x(m)*phi_t
-!!$
-!!$          shellno = shell(m)
-!!$
-!!$          pert = shell_amp(shellno)*sin(phi)
-!!$
-!!$          rand_vec(1) = rand_vec(1) + u_hat_pn(m,1)*pert
-!!$          rand_vec(2) = rand_vec(2) + u_hat_pn(m,2)*pert
-!!$          rand_vec(3) = rand_vec(3) + u_hat_pn(m,3)*pert
-!!$
-!!$       enddo
-!!$
-!!$       ! Project the rand_vec if there is a rotation
-!!$       urand = rand_vec(1)*cosa - rand_vec(2)*sina
-!!$       vrand = rand_vec(1)*sina + rand_vec(2)*cosa
-!!$       wrand = rand_vec(3)
-!!$
-!!$       u_bc(i,1,1,1) = this%u_baseflow(idx) + &
-!!$            fringe_time*this%fringe_space(idx)*urand
-!!$       v_bc(i,1,1,1) = this%v_baseflow(idx) + &
-!!$            fringe_time*this%fringe_space(idx)*vrand
-!!$       w_bc(i,1,1,1) = this%w_baseflow(idx) + &
-!!$            fringe_time*this%fringe_space(idx)*wrand
-!!$
-!!$    end do
 
   end subroutine FST_apply_BC
 

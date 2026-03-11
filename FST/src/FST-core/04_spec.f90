@@ -14,9 +14,12 @@ module spec
   
 contains
 
-  subroutine spec_s(dlx, dly, dlz, periodic_x, periodic_y, periodic_z)
+  subroutine spec_s(dlx, dly, dlz, periodic_x, periodic_y, periodic_z, &
+                    seed, write_file_path)
     real(kind=rp), intent(out) :: dlx, dly, dlz
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
+    integer, intent(inout) :: seed
+    character(len=*), intent(in) :: write_file_path
 
     character(len=LOG_SIZE) :: log_buf
 
@@ -103,7 +106,7 @@ contains
 
     !     Write wavenumbers to ffst_ile
     if (write_files) then
-      open(file='sphere.dat', unit=10)
+      open(file=trim(write_file_path) // '/sphere.dat', unit=10)
 
       write(10,*) 'energy shell parameters'
       write(10,'(a20,i18)') 'Nshells',nshells
@@ -138,7 +141,7 @@ contains
         kk(i),Np,seed)
 
       call periodicity_chk(co(1,i,1),co(1,i,2),co(1,i,3), &
-        Np,kk(i),dlx,dly,dlz, periodic_x, periodic_y, periodic_z)
+        Np,kk(i),dlx,dly,dlz, periodic_x, periodic_y, periodic_z, seed)
 
         !write (*,*) "COCO", co(1,i,1)
       !     add second dodecaeder mirrored at (x)-axis
@@ -223,7 +226,7 @@ contains
       end do          ! j=1,2*Np
     end do            ! i=1,nshells
     ! write(6,*) 'FST - (0,0,0) wavenumber removed'
-    call neko_log%message('[FST] (0,0,0) wavenumber removed')
+    call neko_log%message(' [FST] (0,0,0) wavenumber removed')
 
     write(log_buf, *) '[FST] Saved ',z1,' of ',z1+z2, ' fst modes.'
     call neko_log%message(log_buf)
@@ -318,7 +321,7 @@ contains
 
 !---------------------------------------------------------------------- 
 
- subroutine periodicity_chk(kx,ky,kz,np,kk,dlx,dly,dlz, ifxp, ifyp, ifzp)
+ subroutine periodicity_chk(kx,ky,kz,np,kk,dlx,dly,dlz, ifxp, ifyp, ifzp, seed)
 
     !      implicit none
 
@@ -326,7 +329,7 @@ contains
     integer :: nmax,nmin,kn
 
     logical :: ifxp,ifyp,ifzp
-    !integer :: seed
+    integer :: seed
 
     integer :: np
     real(kind=rp) :: flip

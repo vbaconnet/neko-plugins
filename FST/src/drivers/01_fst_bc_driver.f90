@@ -41,6 +41,9 @@ module fst_bc_driver
   !! to use `masked_copy` (see later for clarifications).
   integer, allocatable :: STUPID_MASK(:)
 
+  !> Path to the fst files.
+  character(len=:), allocatable :: PATH
+
   ! ============================================================================
 
   public :: fst_bc_driver_initialize, fst_bc_driver_finalize, &
@@ -148,6 +151,8 @@ module fst_bc_driver
     call json_get(params, "case.FST.regen_files", REGEN)
     if (.not. REGEN) call json_get(params, "case.FST.Uinf", UINF)
     
+    call json_get_or_default(params, 'case.FST.read_path', PATH, ".")
+
     ! Initialize the fst parameters
     call FST_OBJ%init_bc(zmin, zmax, zstart, zend, &
             delta_z, delta_z, &
@@ -177,8 +182,9 @@ module fst_bc_driver
     ! At the first timestep we generate the FST based
     ! on the boundry mask!
     !
-    if (tstep .eq. 1) then
-       call FST_obj%generate_bc(coef, bc%msk, bc%msk(0), u, v, w, REGEN, UINF)
+    if (.not. FST_obj%is_generated) then
+       call FST_obj%generate_bc(coef, bc%msk, bc%msk(0), u, v, w, REGEN, &
+                                UINF, PATH)
     end if
 
     ! Then, apply the free stream turbulence that will add on

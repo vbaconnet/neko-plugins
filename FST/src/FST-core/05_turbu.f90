@@ -9,9 +9,14 @@ contains
 
   !---------------------------------------------------------------------- 
     
-  subroutine make_turbu(coef, periodic_x, periodic_y, periodic_z)
-    type(coef_t), intent(in) :: coef
+  subroutine make_turbu(periodic_x, periodic_y, periodic_z, seed, &
+                        write_file_path, dx, dy, dz, gdim, coef)
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
+integer, intent(inout) :: seed
+    character(len=*), intent(in) :: write_file_path
+    real(kind=rp), intent(in), optional :: dx, dy, dz
+    integer, intent(in), optional :: gdim 
+    type(coef_t), intent(in), optional :: coef
 
     integer :: k,i,j
     integer :: shellno
@@ -47,10 +52,13 @@ contains
     if ( pe_rank.eq.0 ) then
       
       ! Hardcoded seed for random # generation.This way the FST generated is always the same.  
-      seed = -143        
+      !seed = -143        
 
-      if (write_files) open(unit=137,form='formatted',file='bb.txt')
-      call spec_s(dlx, dly, dlz, periodic_x, periodic_y, periodic_z) ! get isotropically distributed wavenumbers in spheres
+      if (write_files) open(unit=137,form='formatted', &
+                            file=trim(write_file_path) // '/bb.txt')
+
+      call spec_s(dlx, dly, dlz, periodic_x, periodic_y, periodic_z, seed, &
+              write_file_path) ! get isotropically distributed wavenumbers in spheres
 
       do k=1,coef%msh%gdim
         do i=1,fst_modes
@@ -99,7 +107,7 @@ contains
       ve=0.
       we=0.
       !           Also write the modes
-      if (write_files) open(file='fst_spectrum.csv',unit=13)
+      if (write_files) open(file=trim(write_file_path) // '/fst_spectrum.csv', unit=13)
       if (write_files) write(13,'(7(A, ","),A)') 'ShellNo','kx','ky','kz', &
             'amp','u_hat_pn1','u_hat_pn2', 'u_hat_pn3'
       do i=1,k_length
