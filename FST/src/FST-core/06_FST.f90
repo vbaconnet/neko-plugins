@@ -14,7 +14,7 @@ module FST
   use coefs, only: coef_t
   use logger, only: neko_log, LOG_SIZE
   use point_zone, only: point_zone_t
-  use math, only: masked_gather_copy
+  use math, only: masked_gather_copy_0
   use device_math, only: device_masked_gather_copy_0
   use num_types, only: rp, xp
   use comm, only: pe_rank, MPI_EXTRA_PRECISION, NEKO_COMM
