@@ -25,7 +25,7 @@ module global_params
 
   integer :: k_length
   integer :: shell(fst_modes)
-  integer :: seed
+  !integer :: seed
 
   real(kind=rp) :: k_num(fst_modes, 3)
   real(kind=rp) :: k_num_all(fst_modes, 3)
