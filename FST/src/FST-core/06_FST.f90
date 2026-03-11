@@ -91,7 +91,7 @@ module FST
      real(kind=xp), allocatable :: k_x(:)
      type(c_ptr) :: k_x_d = C_NULL_PTR
      real(kind=xp), allocatable :: phase_shifts(:)
-
+     
      !> Indicates whether the FST has been generated
      logical :: is_generated = .false.
 
@@ -197,8 +197,9 @@ contains
 
     call neko_log%section(' [FST] Initializing forcing')
 
-    call this%init_common(xstart, xend,xstart,xend,x_delta_rise, x_delta_fall, ystart, &
-         yend, ystart, yend, y_delta_rise, y_delta_fall, fringe_max, t_start, t_end, &
+    call this%init_common(xstart, xend, xstart, xend, x_delta_rise, &
+         x_delta_fall, ystart, yend, ystart, yend, y_delta_rise, &
+         y_delta_fall, fringe_max, t_start, t_end, &
          periodic_x, periodic_y, periodic_z)
 
     call neko_log%end_section('')
@@ -629,7 +630,7 @@ contains
     integer :: ierr, i, idx, m, j
     
     if (regen) then
-
+      
       ! Generate everything from scratch. This will create the files
       ! bb.txt, sphere.dat and fst_spectrum.csv
        call this%generate_common(coef, path)
@@ -746,6 +747,8 @@ contains
             HOST_TO_DEVICE, .true.)
     end if
 
+    this%is_generated = .true.
+
   end subroutine FST_generate_bc
 
   ! Forcing to be performed on entire domain, on a local element ix
@@ -818,14 +821,10 @@ contains
     integer, intent(in) :: n ! size of the bc mask
     integer, intent(in) :: bc_mask(0:n)
     real(kind=rp), intent(in) :: t
-    real(kind=rp), intent(inout), dimension(:,:,:,:) :: u_bc, v_bc, w_bc
+    !real(kind=rp), intent(inout), dimension(:,:,:,:) :: u_bc, v_bc, w_bc
+    type(field_t), intent(inout) :: u_bc, v_bc, w_bc
     real(kind=xp), intent(in) :: angleXY
     logical, intent(in) :: on_host
-
-!!$    integer :: idx, l, m, i, shellno
-!!$    integer, parameter :: gdim = 3
-!!$    real(kind=rp) :: phase_shft, phi, amp, pert, urand, vrand, wrand
-!!$    real(kind=rp) :: rand_vec(gdim), vel_mag, phi_t
 
     real(kind=xp) :: fringe_time, cosa, sina
 
@@ -833,7 +832,7 @@ contains
     cosa = cos(angleXY)
     sina = sin(angleXY)
 
-    call fst_bc_compute(t, this%Uinf, u_bc, v_bc, w_bc, bc_mask, n, &
+    call fst_bc_compute(t, this%Uinf, u_bc%x, v_bc%x, w_bc%x, bc_mask, n, &
        this%u_baseflow, this%v_baseflow, this%w_baseflow, &
        this%k_x, this%n_modes_total, this%phi_0, this%shell, this%shell_amp, &
        this%random_vectors, angleXY, fringe_time, this%fringe_space, on_host)
