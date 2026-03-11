@@ -192,7 +192,7 @@ module fst_bc_driver
     ! NOTE: if on_cpu is true, memory is not copied to the GPU (you need
     ! to do it yourself)
     call FST_obj%apply_BC(bc%msk, bc%msk(0), &
-         t, u%x, v%x, w%x, angle, on_cpu)
+         t, u, v, w, angle, on_cpu)
 
     ! If we compute on cpu, copy memory. This is slower!
     if (NEKO_BCKND_DEVICE .eq. 1 .and. on_cpu) then
