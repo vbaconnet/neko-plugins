@@ -145,6 +145,7 @@ contains
 
     integer :: seed_ = -143
     if (present(seed)) seed_ = seed
+    this%seed = seed_
 
     this%periodic_x = periodic_x
     this%periodic_y = periodic_y

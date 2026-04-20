@@ -12,3 +12,7 @@ fst_spectrum.dat
 *.chkp
 sphere.dat
 sphere.csv
+FST/example/fort.0
+FST/example/neko
+FST/example/usr_driver.f90
+tripping/neko
