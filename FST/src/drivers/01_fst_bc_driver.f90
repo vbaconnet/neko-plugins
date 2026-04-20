@@ -151,7 +151,7 @@ module fst_bc_driver
     call json_get(params, "case.FST.regen_files", REGEN)
     if (.not. REGEN) call json_get(params, "case.FST.Uinf", UINF)
     
-    call json_get_or_default(params, 'case.FST.read_path', PATH, ".")
+    call json_get_or_default(params, 'case.FST.fst_path', PATH, ".")
 
     ! Initialize the fst parameters
     call FST_OBJ%init_bc(zmin, zmax, zstart, zend, &

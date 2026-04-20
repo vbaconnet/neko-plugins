@@ -22,6 +22,7 @@ requires the use of the `user_velocity` boundary condition on the desired bounda
 
 The driver module uses some parameters that should be given in the case file. Below is the JSON object taken from `example/run.case` that shows which parameters to use:
 
+With file regeneration:
 ```.json
 "FST": {
       "enabled": true,   // default is true
@@ -32,9 +33,28 @@ The driver module uses some parameters that should be given in the case file. Be
       "yend": 0.01,      // High bound for the fringe function  (Also exists for z, if y is periodic)
       "periodic_z": true, // Self-explanatory. If periodic in y add "periodic_y": true
       "regen_files": true, // Set to true to generate wavenumbers etc. See below for further explanation
-      "Uinf": 1.0,       // Free-stream velocity. Only read if "regen_files" is false.
+      "Uinf": 1.0,       // Free-stream velocity. Only read if "regen_files" is false.      "fst_path": "src" // Path where the fst files should be written.
 }
 ```
+
+Without file regeneration (reuse previously written files)
+```.json
+"FST": {
+      "enabled": true,   // default is true
+      "t_start": 0.0001, // Time at which to start applying FST
+      "t_ramp": 0.001,   // Length of the linear ramp in time
+      "alpha": 0.2,      // see below for full explanation of what this is
+      "ystart": -0.01,   // Lower bound for the fringe function (Also exists for z, if y is periodic)
+      "yend": 0.01,      // High bound for the fringe function  (Also exists for z, if y is periodic)
+      "periodic_z": true, // Self-explanatory. If periodic in y add "periodic_y": true
+      "regen_files": false, // Set to true to generate wavenumbers etc. See below for further explanation
+      "Uinf": 1.0,       // Free-stream velocity. Only read if "regen_files" is false.
+      "fst_path": "src" // Path to the fst files from which to read.
+}
+```
+
+@note That `fst_path` is interpreted differently based on the value of 
+`regen_files`.
 
 ### FST generation
 
