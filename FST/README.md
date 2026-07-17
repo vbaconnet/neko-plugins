@@ -15,28 +15,79 @@ The initialization, generation, application of the FST is driven by `07_fst_bc_d
 - `fst_bc_driver_apply()`
 - `fst_bc_driver_finalize()`
 
-An example of usage is given in the user file `example.f90`. Note that to apply the boundary condition we use the `field_dirichlet_update` function which
-requires the use of the `user_velocity` boundary condition on the desired boundary (see `example.case`).
+An example of usage is given in the user file `example/user.f90`. Note that to apply the boundary condition we use the `field_dirichlet_update` function which
+requires the use of the `user_velocity` boundary condition on the desired boundary (see `example/run.case`).
 
 ## Case file
 
-The driver module uses some parameters that should be given in the case file. Below is the JSON object taken from `example.case` that shows which parameters to use:
+The driver module uses some parameters that should be given in the case file. Below is the JSON object taken from `example/run.case` that shows which parameters to use:
 
+With file regeneration:
 ```.json
 "FST": {
       "enabled": true,   // default is true
       "t_start": 0.0001, // Time at which to start applying FST
       "t_ramp": 0.001,   // Length of the linear ramp in time
       "alpha": 0.2,      // see below for full explanation of what this is
-      "ystart": -0.01,  // Lower bound for the fringe function
-      "yend": 0.01,     // High bound for the fringe function
-      "periodic_z": true // Self-explanatory. If periodic in y add "periodic_y": true
+      "ystart": -0.01,   // Lower bound for the fringe function (Also exists for z, if y is periodic)
+      "yend": 0.01,      // High bound for the fringe function  (Also exists for z, if y is periodic)
+      "periodic_z": true, // Self-explanatory. If periodic in y add "periodic_y": true
+      "regen_files": true, // Set to true to generate wavenumbers etc. See below for further explanation
+      "Uinf": 1.0,       // Free-stream velocity. Only read if "regen_files" is false.      "fst_path": "src" // Path where the fst files should be written.
 }
 ```
 
+Without file regeneration (reuse previously written files)
+```.json
+"FST": {
+      "enabled": true,   // default is true
+      "t_start": 0.0001, // Time at which to start applying FST
+      "t_ramp": 0.001,   // Length of the linear ramp in time
+      "alpha": 0.2,      // see below for full explanation of what this is
+      "ystart": -0.01,   // Lower bound for the fringe function (Also exists for z, if y is periodic)
+      "yend": 0.01,      // High bound for the fringe function  (Also exists for z, if y is periodic)
+      "periodic_z": true, // Self-explanatory. If periodic in y add "periodic_y": true
+      "regen_files": false, // Set to true to generate wavenumbers etc. See below for further explanation
+      "Uinf": 1.0,       // Free-stream velocity. Only read if "regen_files" is false.
+      "fst_path": "src" // Path to the fst files from which to read.
+}
+```
+
+@note That `fst_path` is interpreted differently based on the value of 
+`regen_files`.
+
+### FST generation
+
+In the original implementation, FST wavenumbers and amplitudes are generated
+on-the-fly at the beginning of the simulation. This is the default behavior in
+the present implementation. Generating wavenumbers/amplitudes on-the-fly will
+create three separate files:
+- `bb.txt`, which contains the random phases,
+- `fst_spectrum.csv`, which contains wavenumbers, amplitudes and the random,
+  unitary, divergence-free vectors, and
+- `sphere.dat`, which contains information about # shells, points per shell,
+  and wavenumber discretization parameters.
+
+You also have the possibility to reuse previously generated files to keep
+the same FST parameters across two simulations. To do that, use the parameter
+`FST.regen_files` and set it to `false`. Be careful that the 3 files mentioned
+above must be present in the same folder as your executable. 
+
+The format of the fst_spectrum.csv file is a bit special and differs
+from previous implementations. This version of the code requires it to have 8
+columns, which are as follows:
+
+```.csv
+ShellNo,kx,ky,kz,amp,u_hat_pn1,u_hat_pn2,u_hat_pn3
+```
+
+If `regen_files` is `false`, you must also specify the free-stream velocity
+since nothing from `01_global_params.f90` will be used. This can be done via
+the parameters `FST.Uinf`.
+
 ### Spatial fringe parameters
 
-A smooth fringe function is applied on the 2D inlet plane, which at the moment is assumed to be `(y,z)`.
+A smoothing function in space is applied on the 2D inlet boundary.
 The shape of this fringe is the one used in SIMSON and by lots of other people:
 
 $$
@@ -51,9 +102,20 @@ $$
 
 Note that $\lambda_u = 1$ if the direction `u` is set to be periodic.
 
-`_start` and `_end` parameters need to be set by the user, which represent geometrical coordinates. 
-By default, and only if the direction is not periodic, `_start` will be set to the minimum coordinate on the boundary (in that direction). 
-The same goes for `_end`, it will be by default set to the maximum value.
+
+Below is an example of fringe function in 1 dimension.
+![An example of fringe function with different alphas](fringe.png "Example of fringe function")
+
+And here is an example of how it looks like on an inlet boundary. In this case, we are showing
+the z-component of velocity where the baseflow has 0 velocity. The z-direction is set to be 
+periodic and therefore there is no smoothing along the z-direction. The y-direction is not 
+periodic. We have exaggerated the extents of the fringe function to make it obvious, but
+this will very much be case dependent.
+![A practical example of an inlet boundary](fst.png "Example of z-component of FST on an inlet boundary")
+
+The `_start` and `_end` parameters can be set by the user. By default, and only if the direction is not 
+periodic, `_start`/`_end` will be set to the minimum/maximum coordinate on the boundary (in that direction). 
+
 The quantities $\delta_{u,*}$ are computed as a percentage $\alpha$ of the total boundary length 
 in the direction `u`: $\delta_{u,rise} = \delta_{u,fall} = \alpha * L_u$, where 
 $L_u$ is the total domain length at the inlet in the direction u. 

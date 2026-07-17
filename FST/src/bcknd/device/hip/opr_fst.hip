@@ -43,7 +43,7 @@
  */
 template< typename T, typename U>
 __global__ void fst_kernel(
-                           const U t,
+                           const T t,
                            const U Uinf,
                            T * __restrict__ u,
                            T * __restrict__ v,
@@ -104,26 +104,26 @@ __global__ void fst_kernel(
 
 extern "C" {
 
-void hip_fst(real *t, real *Uinf,
+void hip_fst(real *t, real_xp *Uinf,
               void *u_d, void *v_d, void *w_d, int *mask_d, int *n_mask,
               void *ubf_d, void *vbf_d, void *wbf_d, void *k_x_d,
               int *n_total_modes, void *phi_0_d, int *shell_d,
-              void *shell_amp_d, void *randvec_d, real *cosa, real *sina,
-              real *fringe_time, void *fs_d) {
+              void *shell_amp_d, void *randvec_d, real_xp *cosa, real_xp *sina,
+              real_xp *fringe_time, void *fs_d) {
 
   const dim3 nthrds(1024, 1, 1);
   const dim3 nblcks(*n_mask, 1, 1);
 
-  hipLaunchKernelGGL(HIP_KERNEL_NAME(fst_kernel<real, real>),
+  hipLaunchKernelGGL(HIP_KERNEL_NAME(fst_kernel<real, real_xp>),
                      nblcks, nthrds, 0, (hipStream_t) glb_cmd_queue,
                      *t, *Uinf,
                      (real *) u_d, (real *) v_d, (real *) w_d,
                      (int *) mask_d, *n_mask,
                      (real *) ubf_d, (real *) vbf_d, (real *) wbf_d,
-                     (real *) k_x_d, *n_total_modes,
-                     (real *) phi_0_d, (int *) shell_d, (real *) shell_amp_d,
-                     (real *) randvec_d,
-                     *cosa, *sina, *fringe_time, (real *) fs_d
+                     (real_xp *) k_x_d, *n_total_modes,
+                     (real_xp *) phi_0_d, (int *) shell_d, (real_xp *) shell_amp_d,
+                     (real_xp *) randvec_d,
+                     *cosa, *sina, *fringe_time, (real_xp *) fs_d
                      );
   HIP_CHECK(hipGetLastError());
 

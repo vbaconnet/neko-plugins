@@ -14,9 +14,12 @@ module spec
   
 contains
 
-  subroutine spec_s(dlx, dly, dlz, periodic_x, periodic_y, periodic_z)
+  subroutine spec_s(dlx, dly, dlz, periodic_x, periodic_y, periodic_z, &
+                    seed, write_file_path)
     real(kind=rp), intent(out) :: dlx, dly, dlz
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
+    integer, intent(inout) :: seed
+    character(len=*), intent(in) :: write_file_path
 
     character(len=LOG_SIZE) :: log_buf
 
@@ -87,7 +90,7 @@ contains
       tke_tot1 = tke_tot1 + ek(kstart + i*dkint, fst_il, 1._rp)
     end do
     tke_tot1 = tke_tot1*dkint
-    call print_param('FST - integrated energy in spectrum ',tke_tot1)
+    call print_param('integrated energy in spectrum ',tke_tot1)
     ! ------------------------------------------------------------------------
 
     ! ----- integrate the energy spectrum with nshells points ----------------
@@ -97,13 +100,13 @@ contains
       tke_tot = tke_tot + ek(kstart + (i-1)*dkint,fst_il,1._rp)
     end do
     tke_tot = tke_tot*dkint
-    write (log_buf, *) 'FST - discretized on ', nshells, ' shells :' , tke_tot
+    write (log_buf, *) '[FST] discretized on ', nshells, ' shells :' , tke_tot
     call neko_log%message(log_buf)
     ! -------------------------------------------------------------------------
 
     !     Write wavenumbers to ffst_ile
     if (write_files) then
-      open(file='sphere.dat', unit=10)
+      open(file=trim(write_file_path) // '/sphere.dat', unit=10)
 
       write(10,*) 'energy shell parameters'
       write(10,'(a20,i18)') 'Nshells',nshells
@@ -138,7 +141,7 @@ contains
         kk(i),Np,seed)
 
       call periodicity_chk(co(1,i,1),co(1,i,2),co(1,i,3), &
-        Np,kk(i),dlx,dly,dlz, periodic_x, periodic_y, periodic_z)
+        Np,kk(i),dlx,dly,dlz, periodic_x, periodic_y, periodic_z, seed)
 
         !write (*,*) "COCO", co(1,i,1)
       !     add second dodecaeder mirrored at (x)-axis
@@ -223,9 +226,9 @@ contains
       end do          ! j=1,2*Np
     end do            ! i=1,nshells
     ! write(6,*) 'FST - (0,0,0) wavenumber removed'
-    call neko_log%message('FST - (0,0,0) wavenumber removed')
+    call neko_log%message(' [FST] (0,0,0) wavenumber removed')
 
-    write(log_buf, *) 'Saved ',z1,' of ',z1+z2, ' fst modes.'
+    write(log_buf, *) '[FST] Saved ',z1,' of ',z1+z2, ' fst modes.'
     call neko_log%message(log_buf)
     !      close(12)
 
@@ -293,16 +296,16 @@ contains
 
     !      close(11)
 
-    write (log_buf, *) 'FST - ',k_length,'wavenumbers generated'
+    write (log_buf, *) '[FST]', k_length, 'wavenumbers generated'
     call neko_log%message(log_buf)
     ! 2012 format(A7,1x,i5,1x,A21)
 
-    call print_param('FST - Largest wavelength in x',  2.0*pi/kxmin)
-    call print_param('FST - Smallest wavelength in x', 2.0*pi/kxmax)
-    call print_param('FST - Largest wavelength in y',  2.0*pi/kymin)
-    call print_param('FST - Smallest wavelength in y', 2.0*pi/kymax)
-    call print_param('FST - Largest wavelength in z',  2.0*pi/kzmin)
-    call print_param('FST - Smallest wavelength in z', 2.0*pi/kzmax)
+    call print_param('Largest wavelength in x',  2.0*pi/kxmin)
+    call print_param('Smallest wavelength in x', 2.0*pi/kxmax)
+    call print_param('Largest wavelength in y',  2.0*pi/kymin)
+    call print_param('Smallest wavelength in y', 2.0*pi/kymax)
+    call print_param('Largest wavelength in z',  2.0*pi/kzmin)
+    call print_param('Smallest wavelength in z', 2.0*pi/kzmax)
 
     ! write(6,2015) 'FST - Largest wavelength in x',  2.0*pi/kxmin! ,kxmin
     ! write(6,2016) 'FST - Smallest wavelength in x', 2.0*pi/kxmax! ,kxmax
@@ -318,7 +321,7 @@ contains
 
 !---------------------------------------------------------------------- 
 
- subroutine periodicity_chk(kx,ky,kz,np,kk,dlx,dly,dlz, ifxp, ifyp, ifzp)
+ subroutine periodicity_chk(kx,ky,kz,np,kk,dlx,dly,dlz, ifxp, ifyp, ifzp, seed)
 
     !      implicit none
 
@@ -326,7 +329,7 @@ contains
     integer :: nmax,nmin,kn
 
     logical :: ifxp,ifyp,ifzp
-    !integer :: seed
+    integer :: seed
 
     integer :: np
     real(kind=rp) :: flip

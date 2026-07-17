@@ -6,20 +6,28 @@
 
 module FST
 
-  use, intrinsic :: iso_c_binding, only : c_ptr, C_NULL_PTR
-  use global_params
+  !use global_params
   use fst_operator, only: fst_bc_compute
-  use turbu
+  use turbu, only: make_turbu, glb_uinf
   use utils, only: neko_error
+  use field, only: field_t
+  use coefs, only: coef_t
+  use logger, only: neko_log, LOG_SIZE
   use point_zone, only: point_zone_t
-  use comm, only: pe_rank
   use math, only: masked_gather_copy_0
   use device_math, only: device_masked_gather_copy_0
-  use device, only: device_map, device_memcpy, HOST_TO_DEVICE
+  use num_types, only: rp, xp
+  use comm, only: pe_rank, MPI_EXTRA_PRECISION, NEKO_COMM
+  use neko_config, only: NEKO_BCKND_DEVICE
+  use mpi_f08
+  use device, only: device_map, device_memcpy, HOST_TO_DEVICE, device_get_ptr
+  use, intrinsic :: iso_c_binding, only : c_ptr, C_NULL_PTR
   implicit none
 
 
   type, public :: FST_t
+
+     real(kind=xp) :: Uinf
 
      ! periodic directions
      logical :: periodic_x
@@ -29,7 +37,7 @@ module FST
      ! x fringe
      real(kind=rp) :: xmin
      real(kind=rp) :: xmax
-     real(kind=rp) :: xstart 
+     real(kind=rp) :: xstart
      real(kind=rp) :: xend
      real(kind=rp) :: x_delta_rise
      real(kind=rp) :: x_delta_fall
@@ -43,17 +51,20 @@ module FST
      real(kind=rp) :: y_delta_fall
 
      !> Total fringe amplitude
-     real(kind=rp) :: fringe_max
+     real(kind=xp) :: fringe_max
 
      !> Final ramp time
-     real(kind=rp) :: t_end
-     real(kind=rp) :: t_start
+     real(kind=xp) :: t_end
+     real(kind=xp) :: t_start
 
      logical :: is_forcing
      logical :: is_bc
 
+     integer :: nshells
+     integer :: n_modes_total ! = k_length
+
      !> Fringe in space
-     real(kind=rp), allocatable :: fringe_space(:)
+     real(kind=xp), allocatable :: fringe_space(:)
      type(c_ptr) :: fringe_space_d = C_NULL_PTR
 
      !> Baseflows, if applying on a non-uniform inflow
@@ -65,22 +76,33 @@ module FST
      type(c_ptr) :: w_baseflow_d = C_NULL_PTR
 
      !> Variable that is precomputed to save some time
-     real(kind=rp), allocatable :: phi_0(:,:)
+     real(kind=xp), allocatable :: phi_0(:,:)
      type(c_ptr) :: phi_0_d = C_NULL_PTR
 
-     real(kind=rp), allocatable :: random_vectors(:,:) ! u_hat_pn but reshaped
+     real(kind=xp), allocatable :: random_vectors(:,:) ! u_hat_pn but reshaped
      type(c_ptr) :: random_vectors_d = C_NULL_PTR
-     type(c_ptr) :: u_hat_pn_d = C_NULL_PTR
+     integer, allocatable :: shell(:)
      type(c_ptr) :: shell_d = C_NULL_PTR
+     real(kind=xp), allocatable :: shell_amp(:)
      type(c_ptr) :: shell_amp_d = C_NULL_PTR
 
-     real(kind=rp), allocatable :: k_x(:)
+     real(kind=xp), allocatable :: k_y(:)
+     real(kind=xp), allocatable :: k_z(:)
+     real(kind=xp), allocatable :: k_x(:)
      type(c_ptr) :: k_x_d = C_NULL_PTR
+     real(kind=xp), allocatable :: phase_shifts(:)
+     
+     !> Indicates whether the FST has been generated
+     logical :: is_generated = .false.
+
+     integer :: seed !< Seed for random number generation
+
    contains
 
      ! ======== Init/Free procedures
      procedure, pass(this) :: init_common => FST_init_common
      procedure, pass(this) :: init_bc => FST_init_bc
+     procedure, pass(this) :: read_from_files => FST_read_from_files
      procedure, pass(this) :: init_forcing => FST_init_forcing
      procedure, pass(this) :: free => FST_free_params
      ! =========================================================================
@@ -107,20 +129,23 @@ contains
        ymin, ymax, ystart, yend, y_delta_rise, y_delta_fall, &
        fringe_max, &
        t_start, t_end, &
-       periodic_x, periodic_y, periodic_z)
+       periodic_x, periodic_y, periodic_z, seed)
     class(FST_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: xmin, xmax, xstart
-    real(kind=rp), intent(in) :: xend
-    real(kind=rp), intent(in) :: ymin, ymax, ystart
-    real(kind=rp), intent(in) :: yend
+    real(kind=rp), intent(in) :: xstart, xend, xmin, xmax
+    real(kind=rp), intent(in) :: ystart, yend, ymin, ymax
     real(kind=rp), intent(in) :: x_delta_rise
     real(kind=rp), intent(in) :: x_delta_fall
     real(kind=rp), intent(in) :: y_delta_rise
     real(kind=rp), intent(in) :: y_delta_fall
-    real(kind=rp), intent(in) :: fringe_max
-    real(kind=rp), intent(in) :: t_start
-    real(kind=rp), intent(in) :: t_end
+    real(kind=xp), intent(in) :: fringe_max
+    real(kind=xp), intent(in) :: t_start
+    real(kind=xp), intent(in) :: t_end
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
+    integer, intent(inout), optional :: seed
+
+    integer :: seed_ = -143
+    if (present(seed)) seed_ = seed
+    this%seed = seed_
 
     this%periodic_x = periodic_x
     this%periodic_y = periodic_y
@@ -144,6 +169,8 @@ contains
     this%t_end = t_end
     this%t_start = t_start
 
+    call this%print() ! show parameters
+  
   end subroutine FST_init_common
 
 
@@ -164,19 +191,19 @@ contains
     real(kind=rp), intent(in) :: x_delta_fall
     real(kind=rp), intent(in) :: y_delta_rise
     real(kind=rp), intent(in) :: y_delta_fall
-    real(kind=rp), intent(in) :: fringe_max
-    real(kind=rp), intent(in) :: t_start
-    real(kind=rp), intent(in) :: t_end
+    real(kind=xp), intent(in) :: fringe_max
+    real(kind=xp), intent(in) :: t_start
+    real(kind=xp), intent(in) :: t_end
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
 
-    call neko_log%section('Initializing FST')
+    call neko_log%section(' [FST] Initializing forcing')
 
-    call this%init_common(xstart, xend,xstart,xend,x_delta_rise, x_delta_fall, ystart, &
-         yend, ystart, yend, y_delta_rise, y_delta_fall, fringe_max, t_start, t_end, &
+    call this%init_common(xstart, xend, xstart, xend, x_delta_rise, &
+         x_delta_fall, ystart, yend, ystart, yend, y_delta_rise, &
+         y_delta_fall, fringe_max, t_start, t_end, &
          periodic_x, periodic_y, periodic_z)
 
-    call this%print() ! show parameters
-    call neko_log%end_section('Done --> Intializing FST')
+    call neko_log%end_section('')
 
     this%is_forcing = .true.
     this%is_bc = .false.
@@ -197,30 +224,215 @@ contains
     real(kind=rp), intent(in) :: x_delta_fall
     real(kind=rp), intent(in) :: y_delta_rise
     real(kind=rp), intent(in) :: y_delta_fall
-    real(kind=rp), intent(in) :: t_start
-    real(kind=rp), intent(in) :: t_end
+    real(kind=xp), intent(in) :: t_start
+    real(kind=xp), intent(in) :: t_end
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
 
-    call neko_log%section('Initializing FST')
+    call neko_log%section(' [FST] Initializing BC')
 
     call this%init_common(xmin, xmax, xstart, xend, x_delta_rise, &
             x_delta_fall, ymin, ymax, ystart, yend, y_delta_rise, &
-            y_delta_fall, 1.0_rp, t_start, t_end, &
+            y_delta_fall, 1.0_xp, t_start, t_end, &
             periodic_x, periodic_y, periodic_z)
 
-    call this%print() ! show parameters
-    call neko_log%end_section('Done --> Intializing FST')
+    call neko_log%end_section('')
 
     this%is_forcing = .false.
     this%is_bc = .true.
 
   end subroutine FST_init_bc
+  
+  !> Initialize all the stuff from files generated by the FST code:
+  !! - fst_spectrum.csv
+  !! - sphere.dat
+  !! - bb.txt
+  !!
+  !! NOTE: The structure of fst_spectrum.csv should be:
+  !!  shellno, kx, ky, kz, amp, u_hat_pn(1), u_hat_pn(2), u_hat_pn(3)
+  subroutine FST_read_from_files(this, path)
+    class(FST_t), intent(inout) :: this
+    character(len=*), intent(in) :: path
+
+    integer :: unit, ios, num_columns, num_lines, n_modes_total, i, np_eff, &
+         ierr, prev_shell, idx_shell_amp
+    character(len=1) :: delimiter
+    character(len=1024) :: line
+    character(len=2048) :: fpath
+    character(len=20) :: keyword
+    real(kind=xp) :: tmp
+    character(len=LOG_SIZE) :: log_buf
+
+    call neko_log%section(' [FST] Reading files')
+
+    delimiter = ','
+
+    if (pe_rank .eq. 0) then
+
+       !
+       ! Read sphere.dat to get number of spheres
+       !
+       fpath = trim(path) // "/sphere.dat"
+       call neko_log%message("[FST] Reading " // trim(fpath))
+       open(file = trim(fpath), unit = unit, status = "old", &
+            action="read", iostat=ios)
+
+       if (ios /= 0) then
+          call neko_error("[FST] Error opening " // trim(fpath))
+       end if
+
+       read(unit,*) line
+       read(unit,*) keyword, this%nshells
+       close(unit)
+       
+       write (log_buf, '(A ,I4.4)') "[FST] # of shells:", this%nshells
+       call neko_log%message(log_buf)
+
+       !
+       ! Read FST spectrum, count # of lines to allocate all the arrays
+       !
+       fpath = trim(path) // "/fst_spectrum.csv"
+       open(file=trim(fpath), unit=unit, status="old", action="read", &
+            iostat=ios)
+       call neko_log%message("[FST] Reading " // trim(fpath))
+       if (ios /= 0) then
+          call neko_error("[FST] Error opening " // trim(fpath))
+       end if
+
+       num_columns = 1
+       num_lines = 0
+
+       ! Read the file line by line
+       do
+          read(unit, '(A)', iostat=ios) line
+          if (ios /= 0) exit
+
+          ! If it's the first line, count the columns
+          if (num_columns .eq. 1) then
+
+             ! Count the number of delimiters in the line
+             do i = 1, len_trim(line)
+                if (line(i:i) == delimiter) then
+                   num_columns = num_columns + 1
+                end if
+             end do
+
+          end if ! if num_columns .eq. 1
+
+          num_lines = num_lines + 1
+       end do
+       close(unit)
+
+       ! NOTE: this requirement on the number of columns is a bit hardcoded..
+       !        AND different from the original implementation. Hence the
+       !        extra verbose error message.
+       if (num_columns .ne. 8) then
+          call neko_log%message("[FST] ***ERROR READING fst_spectrum.csv***")
+          call neko_log%message("[FST] fst_spectrum should have 8 cols.")
+          call neko_log%message("[FST] shell,kx,ky,kz,amp,u_hat_pn1,u_hat_pn2,u_hat_pn3")
+          call neko_error("[FST] fst_spectrum.csv should have 8 columns")
+       end if
+
+       ! NOTE: The total number of modes in the file can sometimes be
+       ! different from the theoretical value 2*N_shells*N_points_per_shell.
+       ! This is because some modes are removed in the process.
+       this%n_modes_total = num_lines - 1 ! Remove the header
+       np_eff = this%n_modes_total / this%nshells
+       write (log_buf, '(A ,I5.5)') "[FST] Total # of modes:", this%n_modes_total
+       call neko_log%message(log_buf)
+       write (log_buf, '(A ,I5.5)') "[FST] Eff. # of points:", np_eff
+       call neko_log%message(log_buf)
+
+    end if ! pe_rank .eq. 0
+
+    call MPI_Bcast(this%n_modes_total, 1, MPI_INTEGER, 0, NEKO_COMM, ierr)
+    call MPI_Bcast(this%nshells, 1, MPI_INTEGER, 0, NEKO_COMM, ierr)
+
+    call MPI_Barrier(NEKO_COMM, ierr)
+
+    !
+    ! Allocate all the relevant arrays:
+    ! shell,  kx, ky, kz, amplitudes, u_hat_pn, v_hat_pn, w_hat_pn
+    !
+    allocate(this%shell(this%n_modes_total))
+    allocate(this%k_x(this%n_modes_total))
+    allocate(this%k_y(this%n_modes_total))
+    allocate(this%k_z(this%n_modes_total))
+    allocate(this%shell_amp(this%nshells))
+    allocate(this%random_vectors(this%n_modes_total,3))
+    allocate(this%phase_shifts(this%n_modes_total))
+
+    if (pe_rank .eq. 0) then
+       
+       !
+       ! Now read fst_spectrum again and populate all the arrays
+       !
+       open(file=trim(fpath), unit=unit, status="old", action="read", &
+            iostat=ios)
+       if (ios /= 0) then
+          call neko_error("[FST] Error opening " // trim(fpath))
+       end if
+
+       read(unit,*) line! read the header
+
+       ! Read the file line by line
+       do i = 1, this%n_modes_total
+
+          !if (i//this%nshells .eq. 0)
+          read(unit,*) this%shell(i), this%k_x(i), &
+               this%k_y(i), this%k_z(i), this%shell_amp((i-1)/np_eff+1), &
+               this%random_vectors(i,1), this%random_vectors(i,2), &
+               this%random_vectors(i,3)
+          !print *, "<<0>>",this%shell(i), this%k_x(i), this%k_y(i), this%k_z(i), this%shell_amp((i-1)/np_eff+1), &
+          !     this%random_vectors(i,1), this%random_vectors(i,2), this%random_vectors(i,3)
+       end do
+       close(unit)
+
+       !
+       ! Read the phase shifts in bb.txt
+       !
+       fpath = trim(path) // "/bb.txt"
+       open(file=trim(fpath), unit=unit, status="old", action="read", iostat=ios)
+       if (ios /= 0) then
+          call neko_error("[FST] Error opening " // trim(fpath))
+       end if
+       
+       do i = 1, this%n_modes_total
+          read(unit,*) this%phase_shifts(i), tmp
+       end do
+
+    end if ! pe_rank .eq. 0
+
+    call MPI_Bcast(this%k_x, this%n_modes_total, MPI_EXTRA_PRECISION, 0, &
+         NEKO_COMM, ierr)
+    call MPI_Bcast(this%k_y, this%n_modes_total, MPI_EXTRA_PRECISION, 0, &
+         NEKO_COMM, ierr)
+    call MPI_Bcast(this%k_z, this%n_modes_total, MPI_EXTRA_PRECISION, 0, &
+         NEKO_COMM, ierr)
+    call MPI_Bcast(this%shell, this%n_modes_total, MPI_INTEGER, 0, NEKO_COMM, &
+         ierr)
+    call MPI_Bcast(this%shell_amp, this%nshells, MPI_EXTRA_PRECISION, 0, &
+         NEKO_COMM, ierr)
+    call MPI_Bcast(this%random_vectors, this%n_modes_total*3, &
+         MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr)
+    call MPI_Bcast(this%phase_shifts, this%n_modes_total, MPI_EXTRA_PRECISION, &
+         0, NEKO_COMM, ierr)
+    call MPI_Barrier(NEKO_COMM, ierr)
+
+    call neko_log%end_section('')
+
+  end subroutine FST_read_from_files
 
   !! Free parameters in global params
   subroutine FST_free_params(this)
     class(FST_t), intent(inout) :: this
 
     if(allocated(this%fringe_space)) deallocate(this%fringe_space)
+    if(allocated(this%phi_0)) deallocate(this%phi_0)
+    if(allocated(this%k_x)) deallocate(this%k_x)
+    if(allocated(this%k_y)) deallocate(this%k_y)
+    if(allocated(this%k_z)) deallocate(this%k_z)
+    if(allocated(this%shell)) deallocate(this%shell)
+    if(allocated(this%shell_amp)) deallocate(this%shell_amp)
     if(allocated(this%phi_0)) deallocate(this%phi_0)
 
     if (allocated(this%u_baseflow)) deallocate(this%u_baseflow)
@@ -232,28 +444,41 @@ contains
   subroutine FST_print_params(this)
     class(FST_t) :: this
 
-    call print_param("nshells", real(nshells, kind=rp))
-    call print_param("Npmax", real(Npmax, kind=rp))
-    call print_param("fst_ti", fst_ti)
-    call print_param("fst_il", fst_il)
-    call print_param("kstart", kstart)
-    call print_param("kend", kend)
-    call print_param("xmin", this%xmin)
-    call print_param("xmax", this%xmax)
-    call print_param("xstart", this%xstart)
-    call print_param("xend", this%xend)
-    call print_param("ymin", this%ymin)
-    call print_param("ymax", this%ymax)
-    call print_param("ystart", this%ystart)
-    call print_param("yend", this%yend)
-    call print_param("fringe_max", this%fringe_max)
-    call print_param("x_delta_rise", this%x_delta_rise)
-    call print_param("x_delta_fall", this%x_delta_fall)
-    call print_param("y_delta_rise", this%y_delta_rise)
-    call print_param("y_delta_fall", this%y_delta_fall)
-    call print_param("t_start", this%t_start)
-    call print_param("t_end", this%t_end)
-
+    character(len=LOG_SIZE) :: log_buf
+    
+    if (pe_rank .ne. 0) return
+    write(log_buf, '(A ,F15.7)') "[FST] xstart      ", this%xstart
+    call neko_log%message(log_buf)
+    write(log_buf, '(A ,F15.7)') "[FST] xend        ", this%xend
+    call neko_log%message(log_buf)
+    write(log_buf, '(A ,F15.7)') "[FST] xmin        ", this%xmin
+    call neko_log%message(log_buf)
+    write(log_buf, '(A ,F15.7)') "[FST] xmax        ", this%xmax
+    call neko_log%message(log_buf)
+    write(log_buf, '(A ,F15.7)') "[FST] ystart      ", this%ystart
+    call neko_log%message(log_buf)
+    write(log_buf, '(A ,F15.7)') "[FST] yend        ", this%yend
+    call neko_log%message(log_buf)
+    write(log_buf, '(A ,F15.7)') "[FST] ymin        ", this%ymin
+    call neko_log%message(log_buf)
+    write(log_buf, '(A ,F15.7)') "[FST] ymax        ", this%ymax
+    call neko_log%message(log_buf)
+    write(log_buf, '(A ,F15.7)') "[FST] fringe_max  ", this%fringe_max
+    call neko_log%message(log_buf)
+    write(log_buf, '(A ,F15.7)') "[FST] x_delta_rise", this%x_delta_rise
+    call neko_log%message(log_buf)
+    write(log_buf, '(A ,F15.7)') "[FST] x_delta_fall", this%x_delta_fall
+    call neko_log%message(log_buf)
+    write(log_buf, '(A ,F15.7)') "[FST] y_delta_rise", this%y_delta_rise
+    call neko_log%message(log_buf)
+    write(log_buf, '(A ,F15.7)') "[FST] y_delta_fall", this%y_delta_fall
+    call neko_log%message(log_buf)
+    write(log_buf, '(A ,F15.7)') "[FST] t_start     ", this%t_start
+    call neko_log%message(log_buf)
+    write(log_buf, '(A ,F15.7)') "[FST] t_end       ", this%t_end
+    call neko_log%message(log_buf)
+    write(log_buf, '(A ,I0)')    "[FST] seed        ", this%seed
+    call neko_log%message(log_buf)
   end subroutine FST_print_params
 
   !> Apply a specific baseflow in our region, from a boundary mask.
@@ -331,89 +556,109 @@ contains
   end subroutine FST_apply_baseflow
 
   !> Common function for generation
-  subroutine FST_generate_common(this, coef)
+  subroutine FST_generate_common(this, coef, path)
     class(FST_t), intent(inout) :: this
     type(coef_t), intent(in) :: coef
+    character(len=*), intent(in) :: path
 
     integer :: ierr
 
-    call neko_log%section ('Generating FST')
-    call make_turbu(coef, this%periodic_x, this%periodic_y, this%periodic_z)
+    !
+    ! First, generate everything as usual
+    !
+    call neko_log%section (' [FST] Generating')
+    call make_turbu(this%periodic_x, this%periodic_y, this%periodic_z, &
+                    this%seed, path, coef=coef)
+    call neko_log%end_section('')
 
-    call MPI_Bcast(k_length , 1                   , &
-         MPI_INTEGER         , 0, NEKO_COMM, ierr)
-    call MPI_Bcast(k_num_all, fst_modes*coef%msh%gdim, &
-         MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
-    call MPI_Bcast(k_num    , fst_modes*coef%msh%gdim, &
-         MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
-    call MPI_Bcast(u_hat_pn , fst_modes*coef%msh%gdim, &
-         MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
-    call MPI_Bcast(bb       , fst_modes*coef%msh%gdim, &
-         MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
-    call MPI_Bcast(shell    , fst_modes           , &
-         MPI_INTEGER         , 0, NEKO_COMM, ierr)
-    call MPI_Bcast(shell_amp, nshells             , &
-         MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
-
-    call neko_log%end_section('Done --> Generating FST')
+    !
+    ! Next, use the arrays defined
 
   end subroutine FST_generate_common
 
-  !> Generate FST for forcing
+  !> Generate FST for forcing (empty)
   subroutine FST_generate_forcing(this, coef, zone, u, v, w)
     class(FST_t), intent(inout) :: this
     type(coef_t), intent(in) :: coef
     class(point_zone_t), intent(in) :: zone
     type(field_t), intent(in) :: u, v, w
 
-    real(kind=rp) :: x, y, z
+    real(kind=xp) :: x, y, z
     integer :: ierr, i, idx
 
-    integer, pointer :: mask(:)
+    !! Do the general generation
+    !call this%generate_common(coef)
 
-    ! Do the general generation
-    call this%generate_common(coef)
+    !!
+    !! Copy the baseflow in the zone
+    !!
+    !call this%apply_baseflow(zone%mask, zone%size, u, v, w)
 
-    !
-    ! Copy the baseflow in the zone
-    !
-    call this%apply_baseflow(mask, zone%size, u, v, w)
+    !! Generate the fringe in space
+    !allocate(this%fringe_space(zone%size))
 
-    ! Generate the fringe in space
-    allocate(this%fringe_space(zone%size))
+    !! Initialize the fringe in space
+    !do idx = 1, zone%size
+    !   i = zone%mask(idx)
+    !   x = coef%dof%x(i,1,1,1)
+    !   y = coef%dof%y(i,1,1,1)
+    !   z = coef%dof%z(i,1,1,1)
 
-    ! Initialize the fringe in space
-    do idx = 1, zone%size
-       i = mask(idx)
-       x = coef%dof%x(i,1,1,1)
-       y = coef%dof%y(i,1,1,1)
-       z = coef%dof%z(i,1,1,1)
+    !   if ( x .lt. this%xmin .or. x .gt. this%xmax .or. &
+    !        y .lt. this%ymin .or. y .gt. this%ymax ) then
+    !      this%fringe_space(idx) = 0.0_xp
+    !   else
+    !      this%fringe_space(idx) = fringe(x, y, this)
+    !   end if
 
-       if ( x .lt. this%xmin .or. x .gt. this%xmax .or. &
-            y .lt. this%ymin .or. y .gt. this%ymax ) then
-          this%fringe_space(idx) = 0.0_rp
-       else
-          this%fringe_space(idx) = fringe(x, y, this)
-       end if
-
-    end do
+    !end do
 
   end subroutine FST_generate_forcing
 
   !> Do the generation for BC.
-  subroutine FST_generate_bc(this, coef, bc_mask, n, u, v, w)
+  subroutine FST_generate_bc(this, coef, bc_mask, n, u, v, w, regen, Uinf, path)
     class(FST_t), intent(inout) :: this
     type(coef_t), intent(in) :: coef
     integer, intent(in) :: bc_mask(0:n)
     integer, intent(in) :: n
     type(field_t), intent(in) :: u, v, w
+    logical, intent(in) :: regen
+    character(len=*), intent(in) :: path
+    real(kind=xp), intent(in), optional :: Uinf
 
     character(len=LOG_SIZE) :: log_buf
     real(kind=rp) :: x, y, z
     integer :: ierr, i, idx, m, j
+    
+    if (regen) then
+      
+      ! Generate everything from scratch. This will create the files
+      ! bb.txt, sphere.dat and fst_spectrum.csv
+       call this%generate_common(coef, path)
+       this%Uinf = glb_uinf
 
-    ! Do the general generation
-    call this%generate_common(coef)
+    else
+
+       if (.not. present(Uinf)) then
+          call neko_error("[FST] Provide a value for Uinf if you init from file!")
+       else 
+          this%Uinf = Uinf
+       end if
+
+    end if
+
+    !
+    ! Read data from files (will not use anything from global_params!)
+    !
+    call this%read_from_files(path)
+
+    !
+    ! Print some diagnostics just in case
+    !
+    write (log_buf, '(A,F15.7)') "[FST] Uinf set to ", this%Uinf
+    call neko_log%message(log_buf)
+
+
 
     !
     ! Apply baseflow in the bc zone
@@ -433,7 +678,7 @@ contains
 
        if ( z .lt. this%xmin .or. z .gt. this%xmax .or. &
             y .lt. this%ymin .or. y .gt. this%ymax ) then
-          this%fringe_space(idx) = 0.0_rp
+          this%fringe_space(idx) = 0.0_xp
        else
           this%fringe_space(idx) = fringe(z, y, this)
        end if
@@ -443,63 +688,67 @@ contains
     !
     ! Precompute time-independent term
     ! 
-    allocate(this%phi_0(k_length, n))
+    allocate(this%phi_0(this%n_modes_total, bc_mask(0)))
 
     do j = 1, n
       x = coef%dof%x(bc_mask(j), 1,1,1)
       y = coef%dof%y(bc_mask(j), 1,1,1)
       z = coef%dof%z(bc_mask(j), 1,1,1)
-      do m = 1, k_length
-        this%phi_0(m,j) = k_num_all(m,1)*x + k_num_all(m,2)*y + k_num_all(m,3)*z + bb(m,1) ! bb is phase_shift
-      end do  
+      do m = 1, this%n_modes_total
+        this%phi_0(m,j) = this%k_x(m)*x + this%k_y(m)*y + this%k_z(m)*z + &
+             this%phase_shifts(m)
+      end do
     end do
 
     !
     ! Copy the wavenumbers in x direction
     !
-    allocate(this%k_x(fst_modes))
-
-    do m = 1, fst_modes
-       this%k_x(m) = k_num_all(m,1)
-    end do
-
+!!$    allocate(this%k_x(fst_modes))
+!!$
+!!$    do m = 1, fst_modes
+!!$       this%k_x(m) = k_num_all(m,1)
+!!$    end do
+!!$
     !
     ! Copy a proper version of u_hat_pn with correct size
     !
-    allocate(this%random_vectors(k_length, 3))
-
-    do m = 1, k_length
-       do j =  1, 3
-          this%random_vectors(m,j) = u_hat_pn(m,j)
-       end do
-    end do
-
+!!$    allocate(this%random_vectors(this%n_modes_total, 3))
+!!$
+!!$    do m = 1, this%n_modes_total
+!!$       do j =  1, 3
+!!$          this%random_vectors(m,j) = u_hat_pn(m,j)
+!!$       end do
+!!$    end do
+!!$
     ! Copy everything to device and map with relevant device array pointers
     if (NEKO_BCKND_DEVICE .eq. 1) then
        call device_map(this%fringe_space, this%fringe_space_d, n)
        call device_memcpy(this%fringe_space, this%fringe_space_d, n, &
             HOST_TO_DEVICE, .false.)
 
-       call device_map(this%phi_0, this%phi_0_d, k_length*n)
-       call device_memcpy(this%phi_0, this%phi_0_d, k_length*n, &
+       call device_map(this%phi_0, this%phi_0_d, this%n_modes_total*bc_mask(0))
+       call device_memcpy(this%phi_0, this%phi_0_d, &
+            this%n_modes_total*bc_mask(0), HOST_TO_DEVICE, .false.)
+
+       call device_map(this%random_vectors, this%random_vectors_d, &
+            this%n_modes_total*3)
+       call device_memcpy(this%random_vectors, this%random_vectors_d, &
+            this%n_modes_total*3, HOST_TO_DEVICE, .false.)
+
+       call device_map(this%shell, this%shell_d, this%n_modes_total)
+       call device_memcpy(this%shell, this%shell_d, this%n_modes_total, &
             HOST_TO_DEVICE, .false.)
 
-       call device_map(this%random_vectors, this%random_vectors_d, k_length*3)
-       call device_memcpy(this%random_vectors, this%random_vectors_d, k_length*3, &
+       call device_map(this%shell_amp, this%shell_amp_d, this%nshells)
+       call device_memcpy(this%shell_amp, this%shell_amp_d, this%nshells, &
             HOST_TO_DEVICE, .false.)
 
-       call device_map(shell, this%shell_d, fst_modes)
-       call device_memcpy(shell, this%shell_d, fst_modes, &
-            HOST_TO_DEVICE, .false.)
-
-       call device_map(shell_amp, this%shell_amp_d, nshells)
-       call device_memcpy(shell_amp, this%shell_amp_d, nshells, &
-            HOST_TO_DEVICE, .false.)
-
-       call device_map(this%k_x, this%k_x_d, fst_modes)
-       call device_memcpy(this%k_x, this%k_x_d, fst_modes, &
+       call device_map(this%k_x, this%k_x_d, this%n_modes_total)
+       call device_memcpy(this%k_x, this%k_x_d, this%n_modes_total, &
             HOST_TO_DEVICE, .true.)
     end if
+
+    this%is_generated = .true.
 
   end subroutine FST_generate_bc
 
@@ -523,127 +772,71 @@ contains
     real(kind=rp) :: rand_vec(gdim)
     real(kind=rp) :: fringe_time
 
-    integer, pointer :: mask(:) 
-    mask => zone%mask%get()
-
-    fringe_time = time_ramp(t, this%t_end, this%t_start)
-
-    ! Loop on all points in the point zone 
-    do idx = 1, zone%size
-       i = mask(idx)
-
-       !> This vector will contain the sum of all Fourier modes
-       rand_vec = 0.0_rp
-
-       ! Sum all sin modes for each gll point
-       do m = 1, k_length
-          phase_shft = bb(m,1)
-
-          ! kx(x - U*t) + ky*y + kz*z - random_phase[-pi, pi]
-          ! = kx*x + ky*y + kz*z - kx*U*t - random_phase
-          phi = k_num_all(m,1) * (x(i,1,1,1) - glb_uinf*t) + &
-               k_num_all(m,2) *  y(i,1,1,1) + &
-               k_num_all(m,3) *  z(i,1,1,1) + &
-               phase_shft
-
-          shellno = shell(m)
-          pert = shell_amp(shellno)*sin(phi)
-
-          rand_vec(1) = rand_vec(1) + u_hat_pn(m,1)*pert
-          rand_vec(2) = rand_vec(2) + u_hat_pn(m,2)*pert
-          rand_vec(3) = rand_vec(3) + u_hat_pn(m,3)*pert
-       enddo
-
-       fu(i,1,1,1) = fringe_time*this%fringe_space(idx)*( &
-            this%u_baseflow(idx) + rand_vec(1) - u(i,1,1,1))
-
-       fv(i,1,1,1) = fringe_time*this%fringe_space(idx)*( &
-            this%v_baseflow(idx) + rand_vec(2) - v(i,1,1,1))
-
-       fw(i,1,1,1) = fringe_time*this%fringe_space(idx)*( &
-            this%w_baseflow(idx) + rand_vec(3) - w(i,1,1,1))
-    end do
+!!$    fringe_time = time_ramp(t, this%t_end, this%t_start)
+!!$
+!!$    ! Loop on all points in the point zone
+!!$    do idx = 1, zone%size
+!!$       i = zone%mask(idx)
+!!$
+!!$       !> This vector will contain the sum of all Fourier modes
+!!$       rand_vec = 0.0_rp
+!!$
+!!$       ! Sum all sin modes for each gll point
+!!$       do m = 1, this%n_modes_total
+!!$          phase_shft = bb(m,1)
+!!$
+!!$          ! k_x(x - U*t) + ky*y + kz*z - random_phase[-pi, pi]
+!!$          ! = k_x*x + ky*y + kz*z - k_x*U*t - random_phase
+!!$          phi = k_num_all(m,1) * (x(i,1,1,1) - glb_uinf*t) + &
+!!$               k_num_all(m,2) *  y(i,1,1,1) + &
+!!$               k_num_all(m,3) *  z(i,1,1,1) + &
+!!$               phase_shft
+!!$
+!!$          shellno = shell(m)
+!!$          pert = shell_amp(shellno)*sin(phi)
+!!$
+!!$          rand_vec(1) = rand_vec(1) + u_hat_pn(m,1)*pert
+!!$          rand_vec(2) = rand_vec(2) + u_hat_pn(m,2)*pert
+!!$          rand_vec(3) = rand_vec(3) + u_hat_pn(m,3)*pert
+!!$       enddo
+!!$
+!!$       fu(i,1,1,1) = fringe_time*this%fringe_space(idx)*( &
+!!$            this%u_baseflow(idx) + rand_vec(1) - u(i,1,1,1))
+!!$
+!!$       fv(i,1,1,1) = fringe_time*this%fringe_space(idx)*( &
+!!$            this%v_baseflow(idx) + rand_vec(2) - v(i,1,1,1))
+!!$
+!!$       fw(i,1,1,1) = fringe_time*this%fringe_space(idx)*( &
+!!$            this%w_baseflow(idx) + rand_vec(3) - w(i,1,1,1))
+!!$    end do
 
   end subroutine FST_forcing_zone
 
   ! Apply FST as a boundary condition based on the bc mask
   ! Assumes that u,v,w have the same bc masks
   subroutine FST_apply_BC(this, bc_mask, n, &
-       x, y, z, t, &
+       t, &
        u_bc, v_bc, w_bc, angleXY, on_host)
 
     class(FST_t), intent(in) :: this
     integer, intent(in) :: n ! size of the bc mask
     integer, intent(in) :: bc_mask(0:n)
-    real(kind=rp), intent(in), dimension(:,:,:,:) :: x, y, z
     real(kind=rp), intent(in) :: t
-    real(kind=rp), intent(inout), dimension(:,:,:,:) :: u_bc, v_bc, w_bc
-    real(kind=rp), intent(in) :: angleXY
+    !real(kind=rp), intent(inout), dimension(:,:,:,:) :: u_bc, v_bc, w_bc
+    type(field_t), intent(inout) :: u_bc, v_bc, w_bc
+    real(kind=xp), intent(in) :: angleXY
     logical, intent(in) :: on_host
 
-!!$    integer :: idx, l, m, i, shellno
-!!$    integer, parameter :: gdim = 3
-!!$    real(kind=rp) :: phase_shft, phi, amp, pert, urand, vrand, wrand
-!!$    real(kind=rp) :: rand_vec(gdim), vel_mag, phi_t
-
-    real(kind=rp) :: fringe_time, cosa, sina
+    real(kind=xp) :: fringe_time, cosa, sina
 
     fringe_time = time_ramp(t, this%t_end, this%t_start)
     cosa = cos(angleXY)
     sina = sin(angleXY)
 
-    call fst_bc_compute(t, glb_uinf,u_bc, v_bc, w_bc, bc_mask, n, &
+    call fst_bc_compute(t, this%Uinf, u_bc%x, v_bc%x, w_bc%x, bc_mask, n, &
        this%u_baseflow, this%v_baseflow, this%w_baseflow, &
-       this%k_x, k_length, this%phi_0, shell, shell_amp, &
+       this%k_x, this%n_modes_total, this%phi_0, this%shell, this%shell_amp, &
        this%random_vectors, angleXY, fringe_time, this%fringe_space, on_host)
-
-!!$    phi_t = glb_uinf*t
-!!$    ! Loop on all points in the point zone
-!!$    do idx = 1, bc_mask(0)
-!!$
-!!$       i = bc_mask(idx)
-!!$
-!!$       !> This vector will contain the sum of all Fourier modes
-!!$       rand_vec = 0.0_rp
-!!$
-!!$       ! Sum all sin modes for each gll point
-!!$       do m = 1, k_length
-!!$
-!!$          ! Random phase shifts
-!!$          !phase_shft = bb(m,1)
-!!$
-!!$          ! kx(x - U*t) + ky*y + kz*z + phi
-!!$          ! = kx*x + ky*y + kz*z - kx*U*t + phi
-!!$          !phi = k_num_all(m,1) * (x(i,1,1,1) - glb_uinf*t) + &
-!!$          !     k_num_all(m,2) *  y(i,1,1,1) + &
-!!$          !     k_num_all(m,3) *  z(i,1,1,1) + &
-!!$          !     phase_shft
-!!$
-!!$          phi = this%phi_0(m,idx) - this%k_x(m)*phi_t
-!!$
-!!$          shellno = shell(m)
-!!$
-!!$          pert = shell_amp(shellno)*sin(phi)
-!!$
-!!$          rand_vec(1) = rand_vec(1) + u_hat_pn(m,1)*pert
-!!$          rand_vec(2) = rand_vec(2) + u_hat_pn(m,2)*pert
-!!$          rand_vec(3) = rand_vec(3) + u_hat_pn(m,3)*pert
-!!$
-!!$       enddo
-!!$
-!!$       ! Project the rand_vec if there is a rotation
-!!$       urand = rand_vec(1)*cosa - rand_vec(2)*sina
-!!$       vrand = rand_vec(1)*sina + rand_vec(2)*cosa
-!!$       wrand = rand_vec(3)
-!!$
-!!$       u_bc(i,1,1,1) = this%u_baseflow(idx) + &
-!!$            fringe_time*this%fringe_space(idx)*urand
-!!$       v_bc(i,1,1,1) = this%v_baseflow(idx) + &
-!!$            fringe_time*this%fringe_space(idx)*vrand
-!!$       w_bc(i,1,1,1) = this%w_baseflow(idx) + &
-!!$            fringe_time*this%fringe_space(idx)*wrand
-!!$
-!!$    end do
 
   end subroutine FST_apply_BC
 
@@ -660,7 +853,7 @@ contains
   !   else if (x.ge.f%xend) then
   !      S=1
   !   else
-  !      S=1/(1+erp(1/(x-f%xend)+1/(x-f%xstart)))
+  !      S=1/(1+exp(1/(x-f%xend)+1/(x-f%xstart)))
   !   endif
 
   !   y = f%fringe_max * (S*(x-f%xstart)/(f%delta_rise)-S*((x-f%xend)/f%delta_fall+1))
@@ -671,17 +864,17 @@ contains
   ! Linear ramp in time
   function time_ramp(t, t_end, t_start) result(ramp)
     real(kind=rp), intent(in) :: t
-    real(kind=rp), intent(in) :: t_end
-    real(kind=rp), intent(in) :: t_start
+    real(kind=xp), intent(in) :: t_end
+    real(kind=xp), intent(in) :: t_start
 
-    real(kind=rp) :: ramp
+    real(kind=xp) :: ramp
 
     if (t .le. t_start) then
-       ramp = 0.0_rp
+       ramp = 0.0_xp
     else if (t .lt. t_end) then 
        ramp = (t - t_start)/(t_end - t_start)
     else
-       ramp = 1.0_rp
+       ramp = 1.0_xp
     end if
 
   end function time_ramp
@@ -690,7 +883,7 @@ contains
   ! Fringe function as described in Schlatter (2001), extended to take y bounds into account too
   !
   !   Here is what the fringe looks like, except the ramp-up is not linear
-  !   but erponential (see function S below)
+  !   but exponential (see function S below)
   !
   ! fringe_max      ________
   !                /        \
@@ -707,7 +900,7 @@ contains
     real(kind=rp), intent(in) :: x
     real(kind=rp), intent(in), optional :: y
     type(FST_t), intent(in) :: f
-    real(kind=rp) :: fr
+    real(kind=xp) :: fr
     integer :: i
     character :: a
 
@@ -719,17 +912,17 @@ contains
 
   end function fringe
 
-  ! Smooth step function, 0 if x <= 0, 1 if x >= 1, 1/erp(1/(x-1) + 1/x) between 0 and 1
+  ! Smooth step function, 0 if x <= 0, 1 if x >= 1, 1/exp(1/(x-1) + 1/x) between 0 and 1
   function S(x) result(y)
     real(kind=rp), intent(in) :: x
     real(kind=rp)             :: y
 
-    if ( x.le.0._rp ) then
-       y = 0._rp
-    else if ( x.ge.1._rp ) then
-       y = 1._rp
+    if ( x.le.0._xp ) then
+       y = 0._xp
+    else if ( x.ge.1._xp ) then
+       y = 1._xp
     else
-       y = 1._rp / (1._rp + exp( 1._rp/(x-1._rp) + 1._rp/x))
+       y = 1._xp / (1._xp + exp( 1._xp/(x-1._xp) + 1._xp/x))
     end if
 
   end function S

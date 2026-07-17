@@ -54,17 +54,18 @@ contains
     real(kind=rp), intent(in) :: u_baseflow(:), v_baseflow(:), w_baseflow(:)
     integer, intent(in) :: n_mask, n_total_modes
     integer, intent(in) :: mask(0:n_mask), shell(:)
-    real(kind=rp), intent(in), dimension(:) :: wavenumbers_x, shell_amplitudes, &
+    real(kind=xp), intent(in), dimension(:) :: wavenumbers_x, shell_amplitudes, &
          fringe_space
-    real(kind=rp), intent(in), dimension(:,:) :: phi_0, random_vectors
-    real(kind=rp), intent(in) :: t, Uinf, fringe_time, angleXY
+    real(kind=xp), intent(in), dimension(:,:) :: phi_0, random_vectors
+    real(kind=rp), intent(in) :: t
+    real(kind=xp), intent(in) :: Uinf, fringe_time, angleXY
     logical, intent(in) :: on_host
 
     type(c_ptr) :: fs_d, ubf_d, vbf_d, wbf_d, phi_0_d, randvec_d, shell_d, &
          shell_amp_d, k_x_d, u_d, v_d, w_d, mask_d
 
     integer :: i
-    real(kind=rp) :: sina, cosa
+    real(kind=xp) :: sina, cosa
     cosa = cos(angleXY)
     sina = sin(angleXY)
 

@@ -18,7 +18,15 @@ module fst_bc_driver
   character(len=LOG_SIZE) :: LOG_BUF
   ! ============================================================================
 
+  ! Whether or not FST is enabled
   logical :: ENABLED
+
+  ! Whether or not to generate the FST wavenumbers etc from scratch or to 
+  ! read from the files bb.txt, sphere.dat, fst_spectrum.csv
+  logical :: REGEN
+
+  ! Free-stream velocity (this is only populated if REGEN is true
+  real(kind=xp) :: UINF
 
   !
   ! For outputting the forcing as a field file
@@ -32,6 +40,9 @@ module fst_bc_driver
   !! item at STUPID_MASK(0) = size(STUPID_MASK), this is to be able
   !! to use `masked_copy` (see later for clarifications).
   integer, allocatable :: STUPID_MASK(:)
+
+  !> Path to the fst files.
+  character(len=:), allocatable :: PATH
 
   ! ============================================================================
 
@@ -55,8 +66,8 @@ module fst_bc_driver
     type(field_t), pointer :: fu,fv,fw
     character(len=:), allocatable :: read_str, fname
     logical :: px, py, pz
-    real(kind=xp) :: x, ymin, ymax, zmin, zmax, delta_y, delta_z, Ly, Lz
-    real(kind=xp) :: ystart, yend, zstart, zend
+    real(kind=rp) :: x, ymin, ymax, zmin, zmax, delta_y, delta_z, Ly, Lz
+    real(kind=rp) :: ystart, yend, zstart, zend
     integer :: i, idx, ierr, n
     real(kind=xp) :: alpha, beta, t_ramp, t_start, amp
 
@@ -114,8 +125,8 @@ module fst_bc_driver
        ystart  = ymin + delta_y
        yend    = ymax - delta_y 
     else
-       call json_get_or_default(params, "case.FST.ystart", ystart, ymin)
-       call json_get_or_default(params, "case.FST.yend", yend, ymax)
+       call json_get_or_default(params, "case.FST.y_start", ystart, ymin)
+       call json_get_or_default(params, "case.FST.y_end", yend, ymax)
        delta_y = alpha*Ly
     end if
 
@@ -127,14 +138,20 @@ module fst_bc_driver
        zstart  = zmin + delta_z
        zend    = zmax - delta_z 
     else
-       call json_get_or_default(params, "case.FST.zstart", zstart, zmin)
-       call json_get_or_default(params, "case.FST.zend", zend, zmax)
+       call json_get_or_default(params, "case.FST.z_start", zstart, zmin)
+       call json_get_or_default(params, "case.FST.z_end", zend, zmax)
        delta_z = alpha * Lz
     end if
     
     ! Read parameters for the FST fringe in time
     call json_get(params, "case.FST.t_ramp", t_ramp)
-    call json_get_or_default(params, "case.FST.t_start", t_start, 0.0_rp)
+    call json_get_or_default(params, "case.FST.t_start", t_start, 0.0_xp)
+
+    ! Read options for generating FST from scratch or not
+    call json_get(params, "case.FST.regen_files", REGEN)
+    if (.not. REGEN) call json_get(params, "case.FST.Uinf", UINF)
+    
+    call json_get_or_default(params, 'case.FST.fst_path', PATH, ".")
 
     ! Initialize the fst parameters
     call FST_OBJ%init_bc(zmin, zmax, zstart, zend, &
@@ -154,8 +171,8 @@ module fst_bc_driver
     type(coef_t), intent(inout) :: coef
     real(kind=rp), intent(in) :: t
     integer, intent(in) :: tstep
-    real(kind=rp), intent(in) :: angle
-    logical, intent(in), optional :: on_cpu
+    real(kind=xp), intent(in) :: angle
+    logical, intent(in) :: on_cpu
 
     integer :: i, idx
 
@@ -165,8 +182,9 @@ module fst_bc_driver
     ! At the first timestep we generate the FST based
     ! on the boundry mask!
     !
-    if (tstep .eq. 1) then
-       call FST_obj%generate_bc(coef, bc%msk, bc%msk(0), u=u, v=v, w=w)
+    if (.not. FST_obj%is_generated) then
+       call FST_obj%generate_bc(coef, bc%msk, bc%msk(0), u, v, w, REGEN, &
+                                UINF, PATH)
     end if
 
     ! Then, apply the free stream turbulence that will add on
@@ -174,7 +192,7 @@ module fst_bc_driver
     ! NOTE: if on_cpu is true, memory is not copied to the GPU (you need
     ! to do it yourself)
     call FST_obj%apply_BC(bc%msk, bc%msk(0), &
-         u%dof%x, u%dof%y, u%dof%z, t, u%x, v%x, w%x, angle, on_cpu)
+         t, u, v, w, angle, on_cpu)
 
     ! If we compute on cpu, copy memory. This is slower!
     if (NEKO_BCKND_DEVICE .eq. 1 .and. on_cpu) then

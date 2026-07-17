@@ -5,7 +5,7 @@ module user
 
 contains
 
-  ! Register user defined functions (see user_intf.f90)
+! Register user defined functions (see user_intf.f90)
   subroutine user_setup(u)
     type(user_t), intent(inout) :: u
     u%initialize => initialize ! Initialize parameters
@@ -28,17 +28,16 @@ contains
     p => neko_registry%get_field("p")
 
     coef => neko_user_access%case%fluid%c_Xh
-   
-    call fst_bc_driver_initialize(time%t,u,v,w,p,coef,neko_user_access%case%params) 
+
+    call fst_bc_driver_initialize(time%t,u,v,w,p,coef,neko_user_access%case%params)
 
   end subroutine initialize
-
-  !> Set boundary conditions
+ 
+!> Set boundary conditions
   subroutine user_bc(fields, bc, time)
     type(field_list_t), intent(inout) :: fields
     type(field_dirichlet_t), intent(in) :: bc
     type(time_state_t), intent(in) :: time
-    
     type(field_t), pointer :: ui,vi,wi,pi
     type(coef_t)   , pointer :: coef
 
@@ -61,8 +60,8 @@ contains
          ! At the first time step, apply velocity BC by copying
          ! what has been applied in the initial condition
          !
-         if (time%tstep .eq. 1) then    
-          
+         if (time%tstep .eq. 1) then
+         
             ! Get solution fields (u,v,w) which contain the initial condition
             ! if we are at the first timestep 
             ui => neko_registry%get_field("u")
@@ -81,12 +80,14 @@ contains
          
          end if
 
-
          !
          ! Apply FST
          !
          coef => neko_user_access%case%fluid%c_Xh
-         call fst_bc_driver_apply(u, v, w, bc, coef, time%t, time%tstep, 0.0_rp, .false.)
+         call fst_bc_driver_apply(u, v, w, bc, coef, time%t, time%tstep, &
+                 0.0_xp, & ! Angle in the x-y direction
+                 .false.)  ! Wether to do FST on CPU
+                 
        end associate
 
     !
@@ -95,10 +96,10 @@ contains
     else if (trim(fields%items(1)%ptr%name) .eq. "p") then
 
        associate(p => fields%items(1)%ptr)
-         
-         if (time%tstep .eq. 1) then    
+
+         if (time%tstep .eq. 1) then
             pi => neko_registry%get_field("p")
-         
+
             ! Pressure can be handled directly on GPU
             if (neko_bcknd_device .eq. 1) then
                call device_masked_copy_0(p%x_d, pi%x_d, bc%msk_d, p%dof%size(), bc%msk(0))
