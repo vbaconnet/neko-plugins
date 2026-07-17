@@ -25,10 +25,10 @@
     },
 
     "FST": {
-      "enabled": true, // !!! FST IS DISABLED !!
+      "enabled": true,
       "t_start": 0.05,
       "t_ramp": 0.001,
-      "alpha": 0.15, // 15% distance to the y boundaries
+      "alpha": 0.15,
       "periodic_z": true,
       "y_start": -0.1,
       "y_end": 0.1,
@@ -65,12 +65,10 @@
       "output_value": 100,
       "boundary_conditions": [
         {
-        // inflow
         "type": "user_velocity",
         "zone_indices": [1]
       },
         {
-        // Outflow with specified pressure distribution
         "type": "outflow+user",
         "zone_indices": [2]
       },
@@ -82,6 +80,6 @@
         "type": "no_slip",
         "zone_indices": [4]
       }      ]
-    },
+    }
   }
 }
