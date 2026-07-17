@@ -37,7 +37,7 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 #include <cublas.h>
-#include <device_config.h>
+#include <device/device_config.h>
 #include <device/cuda/check.h>
 #include <math/bcknd/device/cuda/mathops_kernel.h>
 
