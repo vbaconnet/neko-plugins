@@ -54,8 +54,8 @@ module FST
      real(kind=xp) :: fringe_max
 
      !> Final ramp time
-     real(kind=xp) :: t_end
      real(kind=xp) :: t_start
+     real(kind=xp) :: t_end
 
      logical :: is_forcing
      logical :: is_bc
