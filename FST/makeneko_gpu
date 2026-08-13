@@ -50,6 +50,7 @@ FCFLAGS_CURRENT=$(grep "FCFLAGS=" dummy_makeneko | cut -d"'" -f2)
 FCFLAGS_NEW="${FCFLAGS_CURRENT} ${ADD_CUSTOM_DEF}"
 
 sed -i "s|^FCFLAGS=.*|FCFLAGS='${FCFLAGS_NEW}'|g" dummy_makeneko
+chmod u+x dummy_makeneko
 
 # Set the correct files to compile
 backend_path_gpu="${src_path}/bcknd/device"
