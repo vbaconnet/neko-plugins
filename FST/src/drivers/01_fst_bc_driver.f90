@@ -27,6 +27,8 @@ module fst_bc_driver
 
   ! Free-stream velocity (this is only populated if REGEN is true
   real(kind=xp) :: UINF
+  logical :: FST_GENERATED = .false.
+
 
   !
   ! For outputting the forcing as a field file
@@ -182,9 +184,9 @@ module fst_bc_driver
     ! At the first timestep we generate the FST based
     ! on the boundry mask!
     !
-    if (.not. FST_obj%is_generated) then
-       call FST_obj%generate_bc(coef, bc%msk, bc%msk(0), u, v, w, REGEN, &
-                                UINF, PATH)
+    if (tstep .eq. 1 .and. .not. FST_GENERATED) then
+       call FST_obj%generate_bc(coef, bc%msk, bc%msk(0), u=u, v=v, w=w)
+       FST_GENERATED = .true.
     end if
 
     ! Then, apply the free stream turbulence that will add on
