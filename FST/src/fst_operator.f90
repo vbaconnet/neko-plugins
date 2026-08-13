@@ -70,6 +70,7 @@ contains
     sina = sin(angleXY)
 
     if (NEKO_BCKND_DEVICE .eq. 1 .and. .not. on_host) then
+       if (n_mask .eq. 0) return ! safety to avoid kernel launch on 0-size array
        u_d = device_get_ptr(u)
        v_d = device_get_ptr(v)
        w_d = device_get_ptr(w)
