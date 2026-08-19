@@ -405,7 +405,6 @@ contains
           if (rtmp .gt. 1) then
              k1(j) = sign(1.0_rp, k1(j)) * sqrt(rtmp)
           else
-             print *, rtmp
              rtmp = sqrt((K_total_sq - kp(j)**2.0_rp)/2.0_rp)
              k1(j) = sign(1.0_rp,k1(j))*rtmp
              k2(j) = sign(1.0_rp,k2(j))*rtmp
@@ -514,7 +513,7 @@ contains
        valid_config = (rtmp .gt. 1.0_rp)
 
        do while (.not. valid_config)
-
+         
           ! Always reduce the component that is highest
           if (kp1(j) .gt. kp2(j)) then
              n_j1_signed = n_j1_signed - sign(1.0_rp, kp1(j))
