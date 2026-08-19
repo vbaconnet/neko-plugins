@@ -45,9 +45,9 @@ module opr_fst_device
 #ifdef HAVE_CUDA
   interface
      subroutine cuda_fst(t, Uinf, u_d,v_d,w_d, mask_d,n_mask, &
-            ubf_d, vbf_d, wbf_d, k_x_d, n_total_modes, phi_0_d, shell_d, &
-            shell_amp_d, randvec_d, cosa, sina, fringe_time, fs_d) &
-            bind(c, name = 'cuda_fst')
+          ubf_d, vbf_d, wbf_d, k_x_d, n_total_modes, phi_0_d, shell_d, &
+          shell_amp_d, randvec_d, cosa, sina, fringe_time, fs_d) &
+          bind(c, name = 'cuda_fst')
        use, intrinsic :: iso_c_binding
        import c_rp
        type(c_ptr), value :: u_d,v_d,w_d,mask_d,ubf_d,vbf_d,wbf_d,&
@@ -59,9 +59,9 @@ module opr_fst_device
 #elif HAVE_HIP
   interface
      subroutine hip_fst(t, Uinf, u_d,v_d,w_d, mask_d,n_mask, &
-            ubf_d, vbf_d, wbf_d, k_x_d, n_total_modes, phi_0_d, shell_d, &
-            shell_amp_d, randvec_d, cosa, sina, fringe_time, fs_d) &
-            bind(c, name = 'hip_fst')
+          ubf_d, vbf_d, wbf_d, k_x_d, n_total_modes, phi_0_d, shell_d, &
+          shell_amp_d, randvec_d, cosa, sina, fringe_time, fs_d) &
+          bind(c, name = 'hip_fst')
        use, intrinsic :: iso_c_binding
        import c_rp
        type(c_ptr), value :: u_d,v_d,w_d,mask_d,ubf_d,vbf_d,wbf_d,&
@@ -86,12 +86,12 @@ contains
 
 #ifdef HAVE_CUDA
     call cuda_fst(t, Uinf, u_d,v_d,w_d, mask_d,n_mask, &
-            ubf_d, vbf_d, wbf_d, k_x_d, n_total_modes, phi_0_d, shell_d, &
-            shell_amp_d, randvec_d, cosa, sina, fringe_time, fs_d)
+         ubf_d, vbf_d, wbf_d, k_x_d, n_total_modes, phi_0_d, shell_d, &
+         shell_amp_d, randvec_d, cosa, sina, fringe_time, fs_d)
 #elif HAVE_HIP
     call hip_fst(t, Uinf, u_d,v_d,w_d, mask_d,n_mask, &
-            ubf_d, vbf_d, wbf_d, k_x_d, n_total_modes, phi_0_d, shell_d, &
-            shell_amp_d, randvec_d, cosa, sina, fringe_time, fs_d)
+         ubf_d, vbf_d, wbf_d, k_x_d, n_total_modes, phi_0_d, shell_d, &
+         shell_amp_d, randvec_d, cosa, sina, fringe_time, fs_d)
 #else
     call neko_error('No device backend configured')
 #endif
