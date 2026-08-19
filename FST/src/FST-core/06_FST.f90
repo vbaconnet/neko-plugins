@@ -21,6 +21,9 @@ module FST
 
   type, public :: FST_t
 
+     ! Seed for random number generator
+     integer :: seed = -143
+
      ! periodic directions
      logical :: periodic_x
      logical :: periodic_y
@@ -107,7 +110,8 @@ contains
        ymin, ymax, ystart, yend, y_delta_rise, y_delta_fall, &
        fringe_max, &
        t_start, t_end, &
-       periodic_x, periodic_y, periodic_z)
+       periodic_x, periodic_y, periodic_z, &
+       seed)
     class(FST_t), intent(inout) :: this
     real(kind=rp), intent(in) :: xmin, xmax, xstart
     real(kind=rp), intent(in) :: xend
@@ -121,6 +125,11 @@ contains
     real(kind=rp), intent(in) :: t_start
     real(kind=rp), intent(in) :: t_end
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
+    integer, intent(inout), optional :: seed
+
+    integer :: seed_ = -143
+    if (present(seed)) seed_ = seed
+    this%seed = seed_
 
     this%periodic_x = periodic_x
     this%periodic_y = periodic_y
@@ -188,7 +197,7 @@ contains
        xmin, xmax, xstart, xend, x_delta_rise, x_delta_fall, &
        ymin, ymax, ystart, yend, y_delta_rise, y_delta_fall, &
        t_start, t_end, &
-       periodic_x, periodic_y, periodic_z)
+       periodic_x, periodic_y, periodic_z, seed)
 
     class(FST_t), intent(inout) :: this
     real(kind=rp), intent(in) :: xstart, xend, xmin, xmax
@@ -200,13 +209,14 @@ contains
     real(kind=rp), intent(in) :: t_start
     real(kind=rp), intent(in) :: t_end
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
+    integer, intent(inout), optional :: seed
 
     call neko_log%section('Initializing FST')
 
     call this%init_common(xmin, xmax, xstart, xend, x_delta_rise, &
             x_delta_fall, ymin, ymax, ystart, yend, y_delta_rise, &
             y_delta_fall, 1.0_rp, t_start, t_end, &
-            periodic_x, periodic_y, periodic_z)
+            periodic_x, periodic_y, periodic_z, seed)
 
     call this%print() ! show parameters
     call neko_log%end_section('Done --> Intializing FST')
@@ -252,7 +262,7 @@ contains
     call print_param("y_delta_rise", this%y_delta_rise)
     call print_param("y_delta_fall", this%y_delta_fall)
     call print_param("t_start", this%t_start)
-    call print_param("t_end", this%t_end)
+    call print_param("seed", real(this%seed, kind=rp))
 
   end subroutine FST_print_params
 
@@ -331,14 +341,16 @@ contains
   end subroutine FST_apply_baseflow
 
   !> Common function for generation
-  subroutine FST_generate_common(this, coef)
+  subroutine FST_generate_common(this, coef, path)
     class(FST_t), intent(inout) :: this
     type(coef_t), intent(in) :: coef
+    character(len=*), intent(in) :: path
 
     integer :: ierr
 
     call neko_log%section ('Generating FST')
-    call make_turbu(coef, this%periodic_x, this%periodic_y, this%periodic_z)
+    call make_turbu(coef, this%periodic_x, this%periodic_y, this%periodic_z, &
+         this%seed, path)
 
     call MPI_Bcast(k_length , 1                   , &
          MPI_INTEGER         , 0, NEKO_COMM, ierr)
@@ -360,11 +372,12 @@ contains
   end subroutine FST_generate_common
 
   !> Generate FST for forcing
-  subroutine FST_generate_forcing(this, coef, zone, u, v, w)
+  subroutine FST_generate_forcing(this, coef, zone, u, v, w, path)
     class(FST_t), intent(inout) :: this
     type(coef_t), intent(in) :: coef
     class(point_zone_t), intent(in) :: zone
     type(field_t), intent(in) :: u, v, w
+    character(len=*), intent(in) :: path
 
     real(kind=rp) :: x, y, z
     integer :: ierr, i, idx
@@ -372,7 +385,7 @@ contains
     integer, pointer :: mask(:)
 
     ! Do the general generation
-    call this%generate_common(coef)
+    call this%generate_common(coef, path)
 
     !
     ! Copy the baseflow in the zone
@@ -401,19 +414,20 @@ contains
   end subroutine FST_generate_forcing
 
   !> Do the generation for BC.
-  subroutine FST_generate_bc(this, coef, bc_mask, n, u, v, w)
+  subroutine FST_generate_bc(this, coef, bc_mask, n, u, v, w, path)
     class(FST_t), intent(inout) :: this
     type(coef_t), intent(in) :: coef
     integer, intent(in) :: bc_mask(0:n)
     integer, intent(in) :: n
     type(field_t), intent(in) :: u, v, w
+    character(len=*), intent(in) :: path
 
     character(len=LOG_SIZE) :: log_buf
     real(kind=rp) :: x, y, z
     integer :: ierr, i, idx, m, j
 
     ! Do the general generation
-    call this%generate_common(coef)
+    call this%generate_common(coef, path)
 
     !
     ! Apply baseflow in the bc zone

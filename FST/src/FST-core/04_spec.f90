@@ -10,15 +10,18 @@ module spec
   use global_params
   use num_types, only: rp
   use utils, only : neko_error
-  
+  use logger, only : LOG_SIZE, neko_log
+
   implicit none
   
   contains
   
-  subroutine spec_s(dlx, dly, dlz, periodic_x, periodic_y, periodic_z)
+  subroutine spec_s(dlx, dly, dlz, periodic_x, periodic_y, periodic_z, seed, &
+          write_file_path)
     real(kind=rp), intent(out) :: dlx, dly, dlz
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
-    
+    integer, intent(inout) :: seed
+    character(len=*), intent(in) :: write_file_path
     character(len=LOG_SIZE) :: log_buf
     
     
@@ -104,7 +107,7 @@ module spec
     
     !     Write wavenumbers to ffst_ile
     if (write_files) then
-      open(file='sphere.dat', unit=10)
+      open(file=trim(write_file_path) // '/sphere.dat', unit=10)
       
       write(10,*) 'energy shell parameters'
       write(10,'(a20,i18)') 'Nshells',nshells
@@ -140,7 +143,7 @@ module spec
       
       ! Recompute wavenumbers in the periodic directions
       call periodicity_chk(co(1,i,1),co(1,i,2),co(1,i,3), &
-      Np,kk(i),dlx,dly,dlz, periodic_x, periodic_y, periodic_z)
+      Np,kk(i),dlx,dly,dlz, periodic_x, periodic_y, periodic_z, seed)
       
       ! add second dodecaeder mirrored at (x)-axis
       do j=Np+1,2*Np
@@ -323,11 +326,12 @@ module spec
   !! kp periodic, based on the length Lp.
   !! kp is the array of wavenumbers in the periodic direction. kp is filled
   !! with wavenumbers that are multiple of 2pi/Lp, so kp = n*2pi/Lp
-  subroutine make_periodic_1D(k1, k2, kp, np, K_total, Lp)
+  subroutine make_periodic_1D(k1, k2, kp, np, K_total, Lp, seed)
     real(kind=rp), intent(inout) :: k1(1), k2(1), kp(1)
     integer, intent(in) :: np
     real(kind=rp), intent(in) :: K_total
     real(kind=rp), intent(in) :: Lp
+    integer, intent(inout) :: seed
     
     integer :: nmax, nmin, n_j, n_j_signed, j
     real(kind=rp) :: twopi_over_L, rtmp, flip, K_total_sq
@@ -532,12 +536,14 @@ module spec
   end subroutine make_periodic_2D
   
 
-    subroutine periodicity_chk(kx, ky, kz, np, kk, dlx, dly, dlz, ifxp, ifyp, ifzp)
+    subroutine periodicity_chk(kx, ky, kz, np, kk, dlx, dly, dlz, ifxp, ifyp, &
+      ifzp, seed)
     real(kind=rp), intent(inout) :: kx(1),ky(1),kz(1)
     integer, intent(in) :: np
     real(kind=rp), intent(in) :: kk
     real(kind=rp), intent(in) :: dlx,dly,dlz
     logical, intent(in) :: ifxp,ifyp,ifzp
+    integer, intent(inout) :: seed
     
     ! integer :: i,j
     ! integer :: nmax,nmin,kn
@@ -569,11 +575,11 @@ module spec
     else ! Apply 1D correction
 
       if (ifxp) then
-        call make_periodic_1D(ky, kz, kx, np, kk, dlx)
+        call make_periodic_1D(ky, kz, kx, np, kk, dlx, seed)
       elseif (ifyp) then
-        call make_periodic_1D(kz, kx, ky, np, kk, dly)
+        call make_periodic_1D(kz, kx, ky, np, kk, dly, seed)
       elseif (ifzp) then
-        call make_periodic_1D(kx, ky, kz, np, kk, dlz)
+        call make_periodic_1D(kx, ky, kz, np, kk, dlz, seed)
       end if
 
     end if

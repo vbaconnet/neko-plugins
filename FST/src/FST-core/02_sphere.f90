@@ -1,10 +1,8 @@
 module sphere
-  !use neko
   use num_types, only : rp
   use utils, only : neko_error
   use logger, only : LOG_SIZE
   use global_params
-  ! use global_params
   implicit none
   
 contains
