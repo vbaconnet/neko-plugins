@@ -1,5 +1,8 @@
 module sphere
-  use neko
+  !use neko
+  use num_types, only : rp
+  use utils, only : neko_error
+  use logger, only : LOG_SIZE
   use global_params
   ! use global_params
   implicit none
@@ -8,7 +11,7 @@ contains
 
   !     this subroutine computes a set of Np point which are 
   !     (more or less) uniformly distributed on a sphere with
-  !     radius R.
+  !     radius `rad`.
   !
   !      input:    Np      Number of points
   !                        (will be changed in case another number of
@@ -20,22 +23,25 @@ contains
   !                        --> wire.dat will be written
   subroutine compute_sphere(Np,x,y,z,rad,rotx,roty,rotz,file)
     
-    integer :: Np
-    real(kind=rp) :: x(Np), y(Np), z(Np), rotx, roty, rotz
-    logical :: file
+    integer, intent(inout) :: Np
+    real(kind=rp), intent(inout) :: x(Np), y(Np), z(Np)
+    real(kind=rp), intent(in) :: rotx, roty, rotz, rad
+    logical, intent(in) :: file
 
-    integer :: i, j ,k , Nn ,kk
+    integer :: i, j, k, Nn, kk
     real(kind=rp) :: dphi, dtheta  ,theta ,phi
     integer :: Nphi,num ,Npn
     
     real(kind=rp) :: theta1, Nphir
     logical new
     
-    real(kind=rp) :: w,d,rad
+    real(kind=rp) :: w,d
     integer :: N,Nl,Npp,Npn1
     integer :: l(1000,2)
     character(len=LOG_SIZE) :: log_buf
-    
+
+    real(kind=rp) :: pi
+    pi = 4.0*atan(1.0)
     N = 1000
 
 
@@ -46,14 +52,11 @@ contains
     !     this flag sets the algorithm for uniformly distribution
 
 
-    if (Np.gt.N) then
-      write(log_buf,*) "number of points too big. Please change in sphere.f90."
-      call neko_log%message(log_buf)
-      stop
-    end if
+    if (Np.gt.N) &
+      call neko_error("Max number of points hardcoded to 1000 (sphere.f90)")
 
     if (Np.le.2) then
-      call asp(x,y,z,1,0._rp,0._rp,0._rp)
+      call asp(x, y, z, 1, 0._rp, 0._rp, 0._rp)
       Nl=0.
       Np=1.
     else if (Np.eq.4) then
@@ -413,13 +416,13 @@ contains
 
   end subroutine compute_sphere
 
+  !> Fills the vectors x,y,z with the constants xx, yy
+  !! and zz respectively at a given index i.
+  !! NOTE: This function seems kind of redundant, but oh well
   subroutine asp(x,y,z,i,xx,yy,zz)
-    implicit none
-    ! integer N
-    ! N=1000
-    integer i
-    real(kind=rp) :: xx,yy,zz
-    real(kind=rp) :: x(1000),y(1000),z(1000)
+    real(kind=rp), intent(inout) :: x(1000),y(1000),z(1000)
+    integer, intent(in) :: i
+    real(kind=rp), intent(in) :: xx,yy,zz
     x(i)=xx
     y(i)=yy
     z(i)=zz
