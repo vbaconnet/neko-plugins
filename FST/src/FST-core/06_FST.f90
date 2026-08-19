@@ -1,7 +1,7 @@
 ! * Free stream turbulence implementation for neko
 ! * Author: Victor Baconnet (baconnet@kth.se)
 ! * Based in original implementation by Elektra Kluesberg, Prabal Negi
-! 	and Philipp Schlatter. 
+! 	and Philipp Schlatter.
 ! * For FST theory see Schlatter (2001)
 
 module FST
@@ -32,7 +32,7 @@ module FST
      ! x fringe
      real(kind=rp) :: xmin
      real(kind=rp) :: xmax
-     real(kind=rp) :: xstart 
+     real(kind=rp) :: xstart
      real(kind=rp) :: xend
      real(kind=rp) :: x_delta_rise
      real(kind=rp) :: x_delta_fall
@@ -136,14 +136,14 @@ contains
     this%periodic_z = periodic_z
 
     this%xstart = xstart
-    this%xend   = xend
+    this%xend = xend
     this%ystart = ystart
-    this%yend   = yend
+    this%yend = yend
 
-    this%xmin   = xmin
-    this%xmax   = xmax
-    this%ymin   = ymin
-    this%ymax   = ymax
+    this%xmin = xmin
+    this%xmax = xmax
+    this%ymin = ymin
+    this%ymax = ymax
 
     this%fringe_max = fringe_max
     this%x_delta_rise = x_delta_rise!0.002
@@ -214,9 +214,9 @@ contains
     call neko_log%section('Initializing FST')
 
     call this%init_common(xmin, xmax, xstart, xend, x_delta_rise, &
-            x_delta_fall, ymin, ymax, ystart, yend, y_delta_rise, &
-            y_delta_fall, 1.0_rp, t_start, t_end, &
-            periodic_x, periodic_y, periodic_z, seed)
+         x_delta_fall, ymin, ymax, ystart, yend, y_delta_rise, &
+         y_delta_fall, 1.0_rp, t_start, t_end, &
+         periodic_x, periodic_y, periodic_z, seed)
 
     call this%print() ! show parameters
     call neko_log%end_section('Done --> Intializing FST')
@@ -300,7 +300,7 @@ contains
        call masked_gather_copy_0(this%v_baseflow, v%x, mask, u%dof%size(), n)
        call masked_gather_copy_0(this%w_baseflow, w%x, mask, u%dof%size(), n)
     end if
-         
+
   end subroutine FST_apply_baseflow_0
 
   !> Apply a specific baseflow in our region, from a boundary mask.
@@ -337,7 +337,7 @@ contains
        call masked_gather_copy_0(this%v_baseflow, v%x, mask, u%dof%size(), n)
        call masked_gather_copy_0(this%w_baseflow, w%x, mask, u%dof%size(), n)
     end if
-         
+
   end subroutine FST_apply_baseflow
 
   !> Common function for generation
@@ -352,19 +352,19 @@ contains
     call make_turbu(coef, this%periodic_x, this%periodic_y, this%periodic_z, &
          this%seed, path)
 
-    call MPI_Bcast(k_length , 1                   , &
-         MPI_INTEGER         , 0, NEKO_COMM, ierr)
+    call MPI_Bcast(k_length , 1 , &
+         MPI_INTEGER , 0, NEKO_COMM, ierr)
     call MPI_Bcast(k_num_all, fst_modes*coef%msh%gdim, &
          MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
-    call MPI_Bcast(k_num    , fst_modes*coef%msh%gdim, &
+    call MPI_Bcast(k_num , fst_modes*coef%msh%gdim, &
          MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
     call MPI_Bcast(u_hat_pn , fst_modes*coef%msh%gdim, &
          MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
-    call MPI_Bcast(bb       , fst_modes*coef%msh%gdim, &
+    call MPI_Bcast(bb , fst_modes*coef%msh%gdim, &
          MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
-    call MPI_Bcast(shell    , fst_modes           , &
-         MPI_INTEGER         , 0, NEKO_COMM, ierr)
-    call MPI_Bcast(shell_amp, nshells             , &
+    call MPI_Bcast(shell , fst_modes , &
+         MPI_INTEGER , 0, NEKO_COMM, ierr)
+    call MPI_Bcast(shell_amp, nshells , &
          MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
 
     call neko_log%end_section('Done --> Generating FST')
@@ -456,16 +456,16 @@ contains
 
     !
     ! Precompute time-independent term
-    ! 
+    !
     allocate(this%phi_0(k_length, n))
 
     do j = 1, n
-      x = coef%dof%x(bc_mask(j), 1,1,1)
-      y = coef%dof%y(bc_mask(j), 1,1,1)
-      z = coef%dof%z(bc_mask(j), 1,1,1)
-      do m = 1, k_length
-        this%phi_0(m,j) = k_num_all(m,1)*x + k_num_all(m,2)*y + k_num_all(m,3)*z + bb(m,1) ! bb is phase_shift
-      end do  
+       x = coef%dof%x(bc_mask(j), 1,1,1)
+       y = coef%dof%y(bc_mask(j), 1,1,1)
+       z = coef%dof%z(bc_mask(j), 1,1,1)
+       do m = 1, k_length
+          this%phi_0(m,j) = k_num_all(m,1)*x + k_num_all(m,2)*y + k_num_all(m,3)*z + bb(m,1) ! bb is phase_shift
+       end do
     end do
 
     !
@@ -483,7 +483,7 @@ contains
     allocate(this%random_vectors(k_length, 3))
 
     do m = 1, k_length
-       do j =  1, 3
+       do j = 1, 3
           this%random_vectors(m,j) = u_hat_pn(m,j)
        end do
     end do
@@ -537,12 +537,12 @@ contains
     real(kind=rp) :: rand_vec(gdim)
     real(kind=rp) :: fringe_time
 
-    integer, pointer :: mask(:) 
+    integer, pointer :: mask(:)
     mask => zone%mask%get()
 
     fringe_time = time_ramp(t, this%t_end, this%t_start)
 
-    ! Loop on all points in the point zone 
+    ! Loop on all points in the point zone
     do idx = 1, zone%size
        i = mask(idx)
 
@@ -556,8 +556,8 @@ contains
           ! kx(x - U*t) + ky*y + kz*z - random_phase[-pi, pi]
           ! = kx*x + ky*y + kz*z - kx*U*t - random_phase
           phi = k_num_all(m,1) * (x(i,1,1,1) - glb_uinf*t) + &
-               k_num_all(m,2) *  y(i,1,1,1) + &
-               k_num_all(m,3) *  z(i,1,1,1) + &
+               k_num_all(m,2) * y(i,1,1,1) + &
+               k_num_all(m,3) * z(i,1,1,1) + &
                phase_shft
 
           shellno = shell(m)
@@ -607,9 +607,9 @@ contains
     sina = sin(angleXY)
 
     call fst_bc_compute(t, glb_uinf,u_bc, v_bc, w_bc, bc_mask, n, &
-       this%u_baseflow, this%v_baseflow, this%w_baseflow, &
-       this%k_x, k_length, this%phi_0, shell, shell_amp, &
-       this%random_vectors, angleXY, fringe_time, this%fringe_space, on_host)
+         this%u_baseflow, this%v_baseflow, this%w_baseflow, &
+         this%k_x, k_length, this%phi_0, shell, shell_amp, &
+         this%random_vectors, angleXY, fringe_time, this%fringe_space, on_host)
 
 !!$    phi_t = glb_uinf*t
 !!$    ! Loop on all points in the point zone
@@ -692,7 +692,7 @@ contains
 
     if (t .le. t_start) then
        ramp = 0.0_rp
-    else if (t .lt. t_end) then 
+    else if (t .lt. t_end) then
        ramp = (t - t_start)/(t_end - t_start)
     else
        ramp = 1.0_rp
@@ -713,7 +713,7 @@ contains
   !
   !   xmin   xstart         xend   xmax
   !
-  ! The ramp-up 
+  ! The ramp-up
   ! after xstart is of length delta_rise. The same applies for the ramp down
   ! and the distance between xmax and xend. If y is specified then it computes
   ! a 2D fringe
@@ -736,7 +736,7 @@ contains
   ! Smooth step function, 0 if x <= 0, 1 if x >= 1, 1/erp(1/(x-1) + 1/x) between 0 and 1
   function S(x) result(y)
     real(kind=rp), intent(in) :: x
-    real(kind=rp)             :: y
+    real(kind=rp) :: y
 
     if ( x.le.0._rp ) then
        y = 0._rp

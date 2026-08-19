@@ -37,13 +37,13 @@ module fst_bc_driver
 
   !> Path to the fst files.
   character(len=:), allocatable :: PATH
-  
+
   ! ============================================================================
 
   public :: fst_bc_driver_initialize, fst_bc_driver_finalize, &
        fst_bc_driver_apply
 
-  contains
+contains
 
   !> Initialize user variables or external objects
   subroutine fst_bc_driver_initialize(t, u, v, w, p, coef, params)
@@ -118,8 +118,8 @@ module fst_bc_driver
 
        ! Below values are garbage just to initialize the values
        delta_y = 0.0001_rp*Ly
-       ystart  = ymin + delta_y
-       yend    = ymax - delta_y 
+       ystart = ymin + delta_y
+       yend = ymax - delta_y
     else
        call json_get_or_default(params, "case.FST.ystart", ystart, ymin)
        call json_get_or_default(params, "case.FST.yend", yend, ymax)
@@ -131,14 +131,14 @@ module fst_bc_driver
        zmax = zmax + 999.0_rp*Lz
        Lz = zmax - zmin
        delta_z = 0.0001_rp*Lz
-       zstart  = zmin + delta_z
-       zend    = zmax - delta_z 
+       zstart = zmin + delta_z
+       zend = zmax - delta_z
     else
        call json_get_or_default(params, "case.FST.zstart", zstart, zmin)
        call json_get_or_default(params, "case.FST.zend", zend, zmax)
        delta_z = alpha * Lz
     end if
-    
+
     ! Read parameters for the FST fringe in time
     call json_get(params, "case.FST.t_ramp", t_ramp)
     call json_get_or_default(params, "case.FST.t_start", t_start, 0.0_rp)
@@ -147,11 +147,11 @@ module fst_bc_driver
 
     ! Initialize the fst parameters
     call FST_OBJ%init_bc(zmin, zmax, zstart, zend, &
-            delta_z, delta_z, &
-            ymin, ymax, ystart, yend, &
-            delta_y, delta_y, &
-            t_start, t_ramp, &
-            px, py, pz, seed)
+         delta_z, delta_z, &
+         ymin, ymax, ystart, yend, &
+         delta_y, delta_y, &
+         t_start, t_ramp, &
+         px, py, pz, seed)
 
     call json_get_or_default(params, 'case.FST.files_output_path', PATH, &
          "./FST_output_files")
@@ -192,12 +192,12 @@ module fst_bc_driver
 
     ! If we compute on cpu, copy memory. This is slower!
     if (NEKO_BCKND_DEVICE .eq. 1 .and. on_cpu) then
-        if (pe_rank .eq. 0) call neko_warning("You are computing FST on CPU")
-        if (pe_rank .eq. 0) call neko_warning("You are copying memory to GPU")
-        if (pe_rank .eq. 0) call neko_warning("This is very slow! Check on_host")
-        call device_memcpy(u%x, u%x_d, u%size(), HOST_TO_DEVICE, .false.)
-        call device_memcpy(v%x, v%x_d, v%size(), HOST_TO_DEVICE, .false.)
-        call device_memcpy(w%x, w%x_d, w%size(), HOST_TO_DEVICE, .false.)
+       if (pe_rank .eq. 0) call neko_warning("You are computing FST on CPU")
+       if (pe_rank .eq. 0) call neko_warning("You are copying memory to GPU")
+       if (pe_rank .eq. 0) call neko_warning("This is very slow! Check on_host")
+       call device_memcpy(u%x, u%x_d, u%size(), HOST_TO_DEVICE, .false.)
+       call device_memcpy(v%x, v%x_d, v%size(), HOST_TO_DEVICE, .false.)
+       call device_memcpy(w%x, w%x_d, w%size(), HOST_TO_DEVICE, .false.)
     end if
 
   end subroutine fst_bc_driver_apply
