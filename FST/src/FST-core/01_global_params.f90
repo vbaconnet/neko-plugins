@@ -9,23 +9,22 @@ module global_params
   real(kind=rp) :: fst_il = 11.53d-3 ! integral length scale
 
   integer, parameter :: nshells = 80! No of spherical shells
-  integer, parameter :: Npmax = 40  ! Npmax  -  Number of points in a shell
+  integer, parameter :: Npmax = 40 ! Npmax  -  Number of points in a shell
   real(kind=rp), parameter :: kstart = 63.77_rp ! smallest wavenumber
   real(kind=rp), parameter :: kend = 1660.0_rp ! largest wavenumber
 
-  integer, parameter :: fst_modes = 2 * nshells * Npmax ! No of freestream modes  
-  integer :: shell_modes(nshells) ! Modes saved per shell    
+  integer, parameter :: fst_modes = 2 * nshells * Npmax ! No of freestream modes
+  integer :: shell_modes(nshells) ! Modes saved per shell
 
   ! --- These two parameters don't seem to be used
   real(kind=rp) :: kmin = kstart*0.5
   real(kind=rp) :: kmax = kend*2.0
   ! ----------------------------------------------
 
-  real(kind=rp) :: bb(fst_modes, 3)  ! RENAME THESE!!! So confusing
+  real(kind=rp) :: bb(fst_modes, 3) ! RENAME THESE!!! So confusing
 
   integer :: k_length
   integer :: shell(fst_modes)
-  integer :: seed
 
   real(kind=rp) :: k_num(fst_modes, 3)
   real(kind=rp) :: k_num_all(fst_modes, 3)
@@ -44,7 +43,7 @@ contains
     real(kind=rp), intent(in) :: value
     character(len=LOG_SIZE) :: log_buf
 
-    write(log_buf, *) name, ": ", value
+    write(log_buf, *) "[FST] ", name, ": ", value
     call neko_log%message(log_buf)
 
   end subroutine print_param
@@ -57,7 +56,7 @@ contains
     integer, intent(in) :: value
     character(len=LOG_SIZE) :: log_buf
 
-    write(log_buf, *) name, ": ", value
+    write(log_buf, *) "[FST] ", name, ": ", value
     call neko_log%message(log_buf)
 
   end subroutine print_int
@@ -83,36 +82,36 @@ contains
 !     for other use consult the above
 !     Set idum negative for initialization
 !
-      implicit none
+    implicit none
 
-      integer idum,ir(97),m,ia,ic,iff,iy,j
-      real rm
-      parameter (m=714025,ia=1366,ic=150889,rm=1./m)
-      save iff,ir,iy
-      data iff /0/
+    integer idum,ir(97),m,ia,ic,iff,iy,j
+    real rm
+    parameter (m=714025,ia=1366,ic=150889,rm=1./m)
+    save iff,ir,iy
+    data iff /0/
 
-      if (idum.lt.0.or.iff.eq.0) then
+    if (idum.lt.0.or.iff.eq.0) then
 
 !     Initialize
 !
-         iff=1
-         idum=mod(ic-idum,m)
-         do j=1,97
-            idum=mod(ia*idum+ic,m)
-            ir(j)=idum
-         end do
-         idum=mod(ia*idum+ic,m)
-         iy=idum
-      end if
+       iff=1
+       idum=mod(ic-idum,m)
+       do j=1,97
+          idum=mod(ia*idum+ic,m)
+          ir(j)=idum
+       end do
+       idum=mod(ia*idum+ic,m)
+       iy=idum
+    end if
 !
 !     Generate random number
 !
-      j=1+(97*iy)/m
-      iy=ir(j)
-      ran2=iy*rm
-      idum=mod(ia*idum+ic,m)
-      ir(j)=idum
+    j=1+(97*iy)/m
+    iy=ir(j)
+    ran2=iy*rm
+    idum=mod(ia*idum+ic,m)
+    ir(j)=idum
 
-      return
+    return
   end function ran2
 end module global_params

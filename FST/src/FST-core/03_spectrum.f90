@@ -1,8 +1,8 @@
 module spectrum
-    use num_types, only: rp
-    implicit none
-    
-contains 
+  use num_types, only: rp
+  implicit none
+
+contains
 
   !> Computes the Von Karman spectrum
   !! @param k Wave number.
@@ -13,7 +13,7 @@ contains
     real(kind=rp) :: E
 
     E = 2._rp/3._rp*q*1.606_rp * (k*L)**4._rp * L / &
-      (1.350_rp+(k*L)**2._rp)**(17._rp/6._rp)
+         (1.350_rp+(k*L)**2._rp)**(17._rp/6._rp)
   end function ek
 
 end module spectrum

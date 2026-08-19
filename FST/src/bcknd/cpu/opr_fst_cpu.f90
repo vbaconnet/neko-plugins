@@ -42,9 +42,9 @@ contains
 
   !> Compute FST on CPU
   subroutine opr_fst_cpu_fst(t, Uinf, u,v,w, mask,n_mask, &
-            u_baseflow, v_baseflow, w_baseflow, &
-            wavenumbers_x, n_total_modes, phi_0, shell, shell_amplitudes, &
-            random_vectors, cosa, sina, fringe_time, fringe_space)
+       u_baseflow, v_baseflow, w_baseflow, &
+       wavenumbers_x, n_total_modes, phi_0, shell, shell_amplitudes, &
+       random_vectors, cosa, sina, fringe_time, fringe_space)
 
     real(kind=rp), intent(inout), dimension(:,:,:,:) :: u, v, w
     real(kind=rp), intent(in) :: u_baseflow(:), v_baseflow(:), w_baseflow(:)

@@ -33,7 +33,11 @@ The driver module uses some parameters that should be given in the case file. Be
       "periodic_z": true // Whether the z direction is periodic (optional, default is false)
 
       "alpha": 0.2,      // see below for full explanation of what this is (mandatory) 
-      
+
+      "seed" : -143, // The seed to use for random number generation (optional, default is -143)
+
+      "files_output_path" : ".", // where to write the generated fst files (optional, default is "fst_output_files")
+
       // NOTE: start/end parameters below only apply if the direction is non-periodic
       "ystart": -0.01,  // Low bound for the fringe in the y direction
       "yend": 0.01,     // High bound for the fringe in the y direction
