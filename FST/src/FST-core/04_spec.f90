@@ -397,7 +397,6 @@ module spec
           
           !k2(j) = k2(j)       ! k2 stays the same
           rtmp = K_total_sq - kp(j)**2.0_rp - k2(j)**2.0_rp
-          !print *, rtmp
 
           if (rtmp .gt. 1) then                 
             k1(j) = sign(1.0_rp, k1(j)) * sqrt(rtmp)
@@ -511,8 +510,6 @@ module spec
       valid_config = (rtmp .gt. 1.0_rp)
 
       do while (.not. valid_config)
-        
-        print *, rtmp, n_j1_signed, n_j2_signed
 
         ! Always reduce the component that is highest
         if (kp1(j) .gt. kp2(j)) then
@@ -524,7 +521,6 @@ module spec
         end if
 
         rtmp = K_total_sq - kp1(j)**2.0_rp - kp2(j)**2.0_rp
-        print *, rtmp, n_j1_signed, n_j2_signed
         valid_config = (rtmp .gt. 0.0_rp)
 
       end do
