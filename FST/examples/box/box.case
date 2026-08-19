@@ -1,0 +1,79 @@
+{
+  "version": 1.0,
+  "case":
+  {
+    "mesh_file": "box.nmsh",
+    "output_directory": "results",
+    "output_at_end": true,
+    "output_checkpoints": false,
+    "output_boundary": false,
+    "checkpoint_control": "simulationtime",
+    "checkpoint_value": 1.0,
+    "runtime_statistics": {
+      "enabled": false
+    },
+    "time": {
+      "end_time": 1.5,
+      "variable_timestep": true,
+      "target_cfl": 0.5,
+      "timestep": 1e-3,
+      "max_timestep": 0.25e-2
+    },
+    "numerics": {
+      "time_order": 3,
+      "polynomial_order": 5,
+      "dealias": true
+    },
+
+    "FST": {
+      "enabled": true,
+      "t_start": 0.0001,
+      "t_ramp": 0.001,
+      "alpha": 0.3,
+      "periodic_y": true,
+      "periodic_z": true
+    },
+
+    "fluid": {
+      "scheme": "pnpn",
+      "Re": 3000.0,
+      "initial_condition": {
+        "type": "uniform",
+	      "value": [1.0, 0.0, 0.0]
+      },
+      "velocity_solver": {
+        "type": "cg",
+        "preconditioner": {
+          "type": "jacobi"
+        },
+        "absolute_tolerance": 1e-3,
+        "max_iterations": 50,
+        "projection_space_size": 0
+      },
+      "pressure_solver": {
+        "type": "gmres",
+        "preconditioner": {
+          "type": "phmg"
+        },
+        "projection_space_size": 0,
+        "absolute_tolerance": 1e-3,
+        "max_iterations": 50
+      },
+      "output_control": "tsteps",
+      "output_value": 10,
+      "boundary_conditions": 
+      [
+        {
+          // inflow
+          "type": "user_velocity",
+          "zone_indices": [1]
+        },
+        {
+          // Outflow with specified pressure distribution
+          "type": "outflow+user",
+          "zone_indices": [2]
+        }
+      ]
+    }
+  }
+}

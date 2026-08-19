@@ -24,13 +24,22 @@ The driver module uses some parameters that should be given in the case file. Be
 
 ```.json
 "FST": {
-      "enabled": true,   // default is true
-      "t_start": 0.0001, // Time at which to start applying FST
-      "t_ramp": 0.001,   // Length of the linear ramp in time
-      "alpha": 0.2,      // see below for full explanation of what this is
-      "ystart": -0.01,  // Lower bound for the fringe function
-      "yend": 0.01,     // High bound for the fringe function
-      "periodic_z": true // Self-explanatory. If periodic in y add "periodic_y": true
+      "enabled": true,   // Enable/disable FST (optional, default is true)
+
+      "t_start": 0.0001, // Time at which to start applying FST (mandatory) 
+      "t_ramp": 0.001,   // Length of the linear ramp in time (mandatory) 
+
+      "periodic_y": false // Whether the y direction is periodic (optional, default is false)
+      "periodic_z": true // Whether the z direction is periodic (optional, default is false)
+
+      "alpha": 0.2,      // see below for full explanation of what this is (mandatory) 
+      
+      // NOTE: start/end parameters below only apply if the direction is non-periodic
+      "ystart": -0.01,  // Low bound for the fringe in the y direction
+      "yend": 0.01,     // High bound for the fringe in the y direction
+
+      "zstart": -0.01,  // Low bound for the fringe in the z direction
+      "zend": 0.01,     // High bound for the fringe in the z direction
 }
 ```
 

@@ -2,11 +2,11 @@
   "version": 1.0,
   "case":
   {
-    "mesh_file": "box.nmsh",
+    "mesh_file": "channel.nmsh",
     "output_directory": "results",
     "output_at_end": true,
-    "output_checkpoints": true,
-    "output_boundary": true,
+    "output_checkpoints": false,
+    "output_boundary": false,
     "checkpoint_control": "simulationtime",
     "checkpoint_value": 1.0,
     "runtime_statistics": {
@@ -26,19 +26,19 @@
     },
 
     "FST": {
-      "enabled": true, // !!! FST IS DISABLED !!
-      "t_start": 0.3,
+      "enabled": true,
+      "t_start": 0.15,
       "t_ramp": 0.001,
-      "alpha": 0.3, // 15% distance to the y boundaries
+      "alpha": 0.3,
       "periodic_z": true
     },
 
     "fluid": {
       "scheme": "pnpn",
-      "Re": 3000,
+      "Re": 3000.0,
       "initial_condition": {
         "type": "uniform",
-	"value": [1.0, 0.0, 0.0]
+	      "value": [1.0, 0.0, 0.0]
       },
       "velocity_solver": {
         "type": "cg",
@@ -62,23 +62,20 @@
       "output_value": 100,
       "boundary_conditions": [
         {
-        // inflow
-        "type": "user_velocity",
-        "zone_indices": [1]
-      },
+          // inflow
+          "type": "user_velocity",
+          "zone_indices": [1]
+        },
         {
         // Outflow with specified pressure distribution
         "type": "outflow+user",
         "zone_indices": [2]
-      },
+        },
         {
-        "type": "no_slip",
-        "zone_indices": [3]
-      },
-        {
-        "type": "no_slip",
-        "zone_indices": [4]
-      }      ]
-    },
+          "type": "no_slip",
+          "zone_indices": [3, 4]
+        }   
+      ]
+    }
   }
 }
