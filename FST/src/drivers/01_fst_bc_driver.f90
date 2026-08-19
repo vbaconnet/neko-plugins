@@ -73,6 +73,8 @@ module fst_bc_driver
     call json_get_or_default(params, "case.FST.periodic_y", py, .false.)
     call json_get_or_default(params, "case.FST.periodic_z", pz, .false.)
 
+    if (px) call neko_error("Periodicity in x is not supported yet!")
+
     ! Compute the bounds of inlet plane for the fringe. Depending
     ! on which one is periodic we will set a fringe or not.
     ymin = 99.0_rp
