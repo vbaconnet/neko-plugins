@@ -18,4 +18,4 @@ FST/example/usr_driver.f90
 tripping/neko
 FST/src/generate_FST
 FST/examples/box/neko
-.gitignore
+FST/examples/channel/neko
