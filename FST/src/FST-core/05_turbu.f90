@@ -10,11 +10,12 @@ contains
   !----------------------------------------------------------------------
 
   subroutine make_turbu(coef, periodic_x, periodic_y, periodic_z, seed, &
-       write_file_path)
+       write_file_path, Lx, Ly, Lz)
     type(coef_t), intent(in) :: coef
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
     integer, intent(inout) :: seed
     character(len=*), intent(in) :: write_file_path
+    real(kind=rp), intent(in), optional :: Lx, Ly, Lz
 
     integer :: k,i,j
     integer :: shellno
@@ -24,14 +25,32 @@ contains
     real(kind=rp) :: u_hat(fst_modes, 3), u_hat_p(fst_modes, 3)
     character(len=LOG_SIZE) :: log_buf
 
-    dlx = glmax(coef%dof%x, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv) - &
-         glmin(coef%dof%x, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv)
+    if (present(Lx)) then
+      dlx = Lx
+      write (log_buf, *) "[FST] Length in x: ", dlx
+      call neko_log%message(log_buf)
+    else
+      dlx = glmax(coef%dof%x, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv) - &
+          glmin(coef%dof%x, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv)
+    end if
 
-    dly = glmax(coef%dof%y, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv) - &
-         glmin(coef%dof%y, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv)
+    if (present(Ly)) then
+      dly = Ly
+      write (log_buf, *) "[FST] Length in y: ", dly
+      call neko_log%message(log_buf)
+    else
+      dly = glmax(coef%dof%y, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv) - &
+          glmin(coef%dof%y, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv)
+    end if
 
-    dlz = glmax(coef%dof%z, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv) - &
-         glmin(coef%dof%z, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv)
+    if (present(Lz)) then
+      dlz = Lz
+      write (log_buf, *) "[FST] Length in z: ", dlz
+      call neko_log%message(log_buf)
+    else
+      dlz = glmax(coef%dof%z, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv) - &
+          glmin(coef%dof%z, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv)
+    end if
 
     if ( pe_rank.eq.0 ) then
 

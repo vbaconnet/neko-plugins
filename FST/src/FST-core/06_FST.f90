@@ -341,16 +341,17 @@ contains
   end subroutine FST_apply_baseflow
 
   !> Common function for generation
-  subroutine FST_generate_common(this, coef, path)
+  subroutine FST_generate_common(this, coef, path, Lx, Ly, Lz)
     class(FST_t), intent(inout) :: this
     type(coef_t), intent(in) :: coef
     character(len=*), intent(in) :: path
+    real(kind=rp), intent(in), optional :: Lx, Ly, Lz
 
     integer :: ierr
 
     call neko_log%section ('Generating FST')
     call make_turbu(coef, this%periodic_x, this%periodic_y, this%periodic_z, &
-         this%seed, path)
+         this%seed, path, Lx, Ly, Lz)
 
     call MPI_Bcast(k_length , 1 , &
          MPI_INTEGER , 0, NEKO_COMM, ierr)
@@ -423,11 +424,49 @@ contains
     character(len=*), intent(in) :: path
 
     character(len=LOG_SIZE) :: log_buf
-    real(kind=rp) :: x, y, z
+    real(kind=rp) :: x, y, z, xmin, xmax, ymin, ymax, zmin, zmax, Lx, Ly, Lz
     integer :: ierr, i, idx, m, j
 
-    ! Do the general generation
-    call this%generate_common(coef, path)
+    !
+    ! Compute the domain lengths of the bc
+    !
+    xmax = -huge(1.0_rp)
+    xmin =  huge(1.0_rp)
+    ymax = -huge(1.0_rp)
+    ymin =  huge(1.0_rp)
+    zmax = -huge(1.0_rp)
+    zmin =  huge(1.0_rp)
+    do idx = 1, n
+      i = bc_mask(idx)
+      xmin = min(xmin, coef%dof%x(i,1,1,1))
+      xmax = max(xmax, coef%dof%x(i,1,1,1))
+      ymin = min(ymin, coef%dof%y(i,1,1,1))
+      ymax = max(ymax, coef%dof%y(i,1,1,1))
+      zmin = min(zmin, coef%dof%z(i,1,1,1))
+      zmax = max(zmax, coef%dof%z(i,1,1,1))
+    end do
+
+    call MPI_Allreduce(MPI_IN_PLACE, xmin, 1, &
+      MPI_REAL_PRECISION, MPI_MIN, NEKO_COMM, ierr)
+    call MPI_Allreduce(MPI_IN_PLACE, xmax, 1, &
+      MPI_REAL_PRECISION, MPI_MAX, NEKO_COMM, ierr)
+    call MPI_Allreduce(MPI_IN_PLACE, ymin, 1, &
+      MPI_REAL_PRECISION, MPI_MIN, NEKO_COMM, ierr)
+    call MPI_Allreduce(MPI_IN_PLACE, ymax, 1, &
+      MPI_REAL_PRECISION, MPI_MAX, NEKO_COMM, ierr)
+    call MPI_Allreduce(MPI_IN_PLACE, zmin, 1, &
+      MPI_REAL_PRECISION, MPI_MIN, NEKO_COMM, ierr)
+    call MPI_Allreduce(MPI_IN_PLACE, zmax, 1, &
+      MPI_REAL_PRECISION, MPI_MAX, NEKO_COMM, ierr)
+
+    Lx = xmax - xmin
+    Ly = ymax - ymin
+    Lz = zmax - zmin
+
+    !
+    ! Do the common generation (not passing Lx since it is not supported yet)
+    !
+    call this%generate_common(coef, path, Ly=Ly, Lz=Lz)
 
     !
     ! Apply baseflow in the bc zone
