@@ -20,6 +20,8 @@ module fst_bc_driver
 
   ! Whether or not FST is enabled
   logical :: ENABLED
+  logical :: FST_GENERATED = .false.
+
 
   ! Whether or not to generate the FST wavenumbers etc from scratch or to 
   ! read from the files bb.txt, sphere.dat, fst_spectrum.csv
@@ -83,6 +85,8 @@ module fst_bc_driver
     call json_get_or_default(params, "case.FST.periodic_x", px, .false.)
     call json_get_or_default(params, "case.FST.periodic_y", py, .false.)
     call json_get_or_default(params, "case.FST.periodic_z", pz, .false.)
+
+    if (px) call neko_error("Periodicity in x is not supported yet!")
 
     ! Compute the bounds of inlet plane for the fringe. Depending
     ! on which one is periodic we will set a fringe or not.

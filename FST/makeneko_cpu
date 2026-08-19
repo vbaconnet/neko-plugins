@@ -27,3 +27,5 @@ driver="${src_path}/drivers/0*"
 
 echo ${NEKO_INSTALL_PATH}/bin/makeneko $backend $interface $fst_core $driver $1
 ${NEKO_INSTALL_PATH}/bin/makeneko $backend $interface $fst_core $driver $1
+
+rm *.mod *.smod

@@ -40,16 +40,22 @@ With file regeneration:
 Without file regeneration (reuse previously written files)
 ```.json
 "FST": {
-      "enabled": true,   // default is true
-      "t_start": 0.0001, // Time at which to start applying FST
-      "t_ramp": 0.001,   // Length of the linear ramp in time
-      "alpha": 0.2,      // see below for full explanation of what this is
-      "ystart": -0.01,   // Lower bound for the fringe function (Also exists for z, if y is periodic)
-      "yend": 0.01,      // High bound for the fringe function  (Also exists for z, if y is periodic)
-      "periodic_z": true, // Self-explanatory. If periodic in y add "periodic_y": true
-      "regen_files": false, // Set to true to generate wavenumbers etc. See below for further explanation
-      "Uinf": 1.0,       // Free-stream velocity. Only read if "regen_files" is false.
-      "fst_path": "src" // Path to the fst files from which to read.
+      "enabled": true,   // Enable/disable FST (optional, default is true)
+
+      "t_start": 0.0001, // Time at which to start applying FST (mandatory) 
+      "t_ramp": 0.001,   // Length of the linear ramp in time (mandatory) 
+
+      "periodic_y": false // Whether the y direction is periodic (optional, default is false)
+      "periodic_z": true // Whether the z direction is periodic (optional, default is false)
+
+      "alpha": 0.2,      // see below for full explanation of what this is (mandatory) 
+      
+      // NOTE: start/end parameters below only apply if the direction is non-periodic
+      "ystart": -0.01,  // Low bound for the fringe in the y direction
+      "yend": 0.01,     // High bound for the fringe in the y direction
+
+      "zstart": -0.01,  // Low bound for the fringe in the z direction
+      "zend": 0.01,     // High bound for the fringe in the z direction
 }
 ```
 
