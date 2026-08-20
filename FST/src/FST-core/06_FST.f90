@@ -9,13 +9,22 @@ module FST
   use, intrinsic :: iso_c_binding, only : c_ptr, C_NULL_PTR
   use global_params
   use fst_operator, only: fst_bc_compute
-  use turbu
+  use turbu, only : make_turbu
+
+  use field, only: field_t
+  use coefs, only: coef_t
+  use num_types, only: rp
   use utils, only: neko_error
   use point_zone, only: point_zone_t
   use comm, only: pe_rank
   use math, only: masked_gather_copy_0
   use device_math, only: device_masked_gather_copy_0
   use device, only: device_map, device_memcpy, HOST_TO_DEVICE
+  use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN, MPI_INTEGER, MPI_Bcast, &
+      MPI_Allreduce
+  use comm, only: MPI_REAL_PRECISION, NEKO_COMM
+  use device, only: device_get_ptr
+  use neko_config, only: NEKO_BCKND_DEVICE
   implicit none
 
 
