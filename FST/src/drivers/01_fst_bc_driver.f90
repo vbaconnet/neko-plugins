@@ -55,15 +55,11 @@ contains
     type(coef_t), intent(inout) :: coef
     type(json_file), intent(inout) :: params
 
-    ! Our variables
-    type(box_point_zone_t), pointer :: bpz, spz
-    type(field_t), pointer :: fu,fv,fw
-    character(len=:), allocatable :: read_str, fname
     logical :: px, py, pz
     real(kind=xp) :: x, ymin, ymax, zmin, zmax, delta_y, delta_z, Ly, Lz
     real(kind=xp) :: ystart, yend, zstart, zend
-    integer :: i, idx, ierr, n, seed
-    real(kind=xp) :: alpha, beta, t_ramp, t_start, amp
+    integer :: i, ierr, seed
+    real(kind=xp) :: alpha, t_ramp, t_start
 
     call json_get_or_default(params, "case.FST.enabled", ENABLED, .true.)
 
