@@ -1,8 +1,10 @@
 module sphere
   use num_types, only : rp
+  use math, only : pi
   use utils, only : neko_error
-  use logger, only : LOG_SIZE
-  use global_params
+  use fst_utils, only : print_param
+  use logger, only : LOG_SIZE, neko_log
+  !use global_params
   implicit none
 
 contains
@@ -38,8 +40,6 @@ contains
     integer :: l(1000,2)
     character(len=LOG_SIZE) :: log_buf
 
-    real(kind=rp) :: pi
-    pi = 4.0*atan(1.0)
     N = 1000
 
 

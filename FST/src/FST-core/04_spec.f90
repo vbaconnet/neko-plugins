@@ -5,25 +5,41 @@
 
 module spec
   use math
-  use sphere
+  use sphere, only: compute_sphere
   use spectrum, only: ek
-  use global_params
+  !use global_params
   use num_types, only: rp
+  use fst_utils, only : ran2
   use utils, only : neko_error
+  use fst_utils, only : print_param
   use logger, only : LOG_SIZE, neko_log
 
   implicit none
 
 contains
 
-  subroutine spec_s(dlx, dly, dlz, periodic_x, periodic_y, periodic_z, seed, &
-       write_file_path)
-    real(kind=rp), intent(out) :: dlx, dly, dlz
+  subroutine spec_s(Npeff, IL, Tu, U_inf, Npmax, Nshells, k_start, k_end, &
+       k_x, k_y, k_z, shell, shell_amp, dlx, dly, dlz, periodic_x, periodic_y, &
+       periodic_z, seed, write_file_path, write_files)
+
+    integer, intent(out) :: Npeff
+    real(kind=rp), intent(in) :: IL, Tu, U_inf
+    integer, intent(in) :: Npmax
+    integer, intent(in) :: Nshells
+    real(kind=rp), intent(in) :: k_start, k_end
+    real(kind=rp), dimension(2*Npmax*Nshells), intent(inout) :: k_x, k_y, k_z
+    integer, intent(inout) :: shell(2*Npmax*Nshells)
+    real(kind=rp), intent(inout) :: shell_amp(nshells)
+    real(kind=rp), intent(in) :: dlx, dly, dlz
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
     integer, intent(inout) :: seed
     character(len=*), intent(in) :: write_file_path
-    character(len=LOG_SIZE) :: log_buf
+    logical, intent(in) :: write_files
 
+    character(len=LOG_SIZE) :: log_buf
+    integer :: shell_modes(nshells) ! Modes saved per shell
+    real(kind=rp) :: k_num(2*Npmax*Nshells, 3)
+    real(kind=rp) :: k_num_all(2*Npmax*Nshells, 3)
 
     ! integer :: Nsmax
     ! Nsmax = nshells
@@ -41,64 +57,40 @@ contains
     integer z1,z2
     !integer :: seed
 
-    real(kind=rp) :: dmin,il,dkint
+    real(kind=rp) :: dmin, dkint
 
     real(kind=rp) :: co(2*Npmax,nshells,3)
-    real(kind=rp) :: kk(0:nshells),q(nshells),dk(nshells)
-    integer :: lu(nshells)
+    real(kind=rp) :: kk(0:nshells)
     real(kind=rp) :: tke_tot !
     real(kind=rp) :: tke_tot1 !
-    real(kind=rp) :: tke_shell(nshells)
 
-    real(kind=rp) :: shell_energy
     real(kind=rp) :: tke_scaled
-
-    real(kind=rp) :: vlsum ! function
-
-    real(kind=rp) :: kxmin,kxmax,kymin,kymax,kzmin,kzmax
-    real(kind=rp) :: ktmp
 
     !----------------------------------------
 
 
-    call print_param('integral length scale', fst_il)
+    call print_param('integral length scale', IL)
     Np = Npmax
 
-    tke_scaled = (3.0/2.*(fst_ti*glb_uinf)**2) ! = 3/2 * Tu**2 * Uinf**2
-
-    !     Just initializing
-    kxmax = 1.0E-20
-    kxmin = 1.0E+20
-
-    kymax = 1.0E-20
-    kymin = 1.0E+20
-
-    kzmax = 1.0E-20
-    kzmin = 1.0E+20
-
-    !     spectrum discretization
-    !      nshells=nshells
-
-    !      write(6,*) 'FST - Largest wavenumber:', 2.0*pi/kstart
-    !      write(6,*) 'FST - Smallest wavenumber:',2.0*pi/kend
+    tke_scaled = (3.0/2.*(Tu*U_inf)**2) ! = 3/2 * Tu**2 * Uinf**2
 
     !  ------ integrate the energy spectrum (mimics continuous integral) ---
     Ndk = 5000 ! just a large no of points on the spectrum
-    dkint = (kend-kstart)/float(Ndk)
+    dkint = (k_end-k_start)/float(Ndk)
 
-    tke_tot1 = (ek(kstart,fst_il,1._rp) + ek(kend,fst_il,1._rp))
+    tke_tot1 = (ek(k_start,IL,1._rp) + ek(k_end,IL,1._rp))
     do i=1,Ndk-1
-       tke_tot1 = tke_tot1 + ek(kstart + i*dkint, fst_il, 1._rp)
+       tke_tot1 = tke_tot1 + ek(k_start + i*dkint, IL, 1._rp)
     end do
     tke_tot1 = tke_tot1*dkint
     call print_param('FST - integrated energy in spectrum ',tke_tot1)
     ! ------------------------------------------------------------------------
 
     ! ----- integrate the energy spectrum with nshells points ----------------
-    dkint = (kend - kstart)/real(nshells-1)
+    dkint = (k_end - k_start)/real(nshells-1)
     tke_tot = 0.
     do i=1,nshells
-       tke_tot = tke_tot + ek(kstart + (i-1)*dkint,fst_il,1._rp)
+       tke_tot = tke_tot + ek(k_start + (i-1)*dkint,IL,1._rp)
     end do
     tke_tot = tke_tot*dkint
     write (log_buf, *) 'FST - discretized on ', nshells, ' shells :' , tke_tot
@@ -111,35 +103,30 @@ contains
 
        write(10,*) 'energy shell parameters'
        write(10,'(a20,i18)') 'Nshells',nshells
-       write(10,'(a20,f18.9)') 'kstart',kstart
-       write(10,'(a20,f18.9)') 'kend',kend
+       write(10,'(a20,f18.9)') 'k_start',k_start
+       write(10,'(a20,f18.9)') 'k_end',k_end
        write(10,'(a20,i18)') 'Np',Np
        write(10,*) 'isotropic coordinates'
        write(10,'(2a5,3a18)') 'i','j','x','y','z'
     endif
 
-    kk(0) =0.
-    !     compute the coordinates using two dodecaeder
-
-    tke_tot1 = 0.
-    !seed = -143
+    kk(0) = 0.0_rp
 
     call print_param("Truncated TKE",tke_scaled/tke_tot)
 
+    !
+    ! Generate the wavenumbers
+    !
     do i=1,nshells
 
-       k2 = ( kstart + (i-1)*(kend - kstart)/real(nshells-1, kind=rp) )**2
-       kk(i) = sqrt(k2) ! kk = kstart, kstart+dk, kstart+2dk + ... + kend
-       dk(i) = (kend - kstart)/real(nshells-1, kind=rp)
+       kk(i) = sqrt(k_start + (i-1)*(k_end - k_start)/real(nshells-1, kind=rp)) ! kk = k_start, k_start+dk, k_start+2dk + ... + k_end
 
-       q(i) = ek(kk(i),fst_il,tke_scaled/tke_tot) ! 1/tke_tot so the total
-       ! truncated energy = tke_scaled
-       tke_shell(i) = q(i)*dk(i)
-       tke_tot1 = tke_tot1 + tke_shell(i)
-
+       print *, ">> BEFORE", Np
        ! Fill            co(1:Np,i,1), co(1:Np,i,2), co(1:Np,i,3)
        call gen_dodeca_k(co(1,i,1), co(1,i,2), co(1,i,3), &
             kk(i),Np,seed)
+       Npeff = Np
+       print *, ">> AFTER", Np
 
        ! Recompute wavenumbers in the periodic directions
        call periodicity_chk(co(1,i,1),co(1,i,2),co(1,i,3), &
@@ -157,46 +144,17 @@ contains
              write(10,'(2i5,3e18.9)') i,j,co(j,i,1),co(j,i,2),co(j,i,3)
           end do
        endif
-
-       !     Get smallest and largest fst modes in x,y,z
-       ! ktmp = vlamax(co(1,i,1),2*Np)
-       ktmp = vlmax(co(1,i,1),2*Np)
-       !        write(6,*) 'ktmp,kmax',ktmp,kxmax
-       if (ktmp.gt.kxmax) kxmax = ktmp
-
-       ktmp = vlamin(co(1,i,1),2*Np)
-       !        write(6,*) 'ktmp,kmin',ktmp,kxmin
-       if (ktmp.lt.kxmin) kxmin = ktmp
-
-       ktmp = vlmax(co(1,i,2),2*Np)
-       if (ktmp.gt.kymax) kymax = ktmp
-
-       ktmp = vlamin(co(1,i,2),2*Np)
-       if (ktmp.lt.kymin) kymin = ktmp
-
-       ktmp = vlmax(co(1,i,3),2*Np)
-       if (ktmp.gt.kzmax) kzmax = ktmp
-
-       ktmp = vlamin(co(1,i,3),2*Np)
-       if (ktmp.lt.kzmin) kzmin = ktmp
-       !--------------------------------------------------
-    end do ! 1,Nshells
-    !      write(6,'(A15,1x,E15.8E2)') 'q-shell total:',
-    !     &      tke_tot1
+    end do
 
     if (write_files) close(10) ! sphere.dat
 
+    !
+    ! Remove mode (0,0,0) if it exists, and assign the result to our
+    ! arrays kx, ky, kz
+    !
     z1=0
     z2=0
-    do i=1,nshells
-       lu(i)=0
-       shell_modes(i)=0
-    end do
-
     l=0
-    !      open(ffst_ile='chosen_coordinates.dat',unit=12)
-    !      write(12,'(A21)') '# choosen coordinates'
-    !      write(12,'(A10,2x,3(A18,2x))') '# Shell No', 'kx', 'ky', 'kz'
     do i=1, nshells
        do j=1, 2*Np
           !         If some modes need to be removed.
@@ -207,21 +165,19 @@ contains
           else
              z1=z1+1
 
-             ! write to chosen_coordinates.dat
-             !              write(12,'(i10,2x,3(E18.9E2,2x))') i,
-             !     &           co(j,i,1), co(j,i,2), co(j,i,3)
-
-             lu(i)=lu(i)+1 ! no of modes in each shell
-             shell_modes(i)=shell_modes(i)+1
-
              l=l+1
              do k=1,3
                 k_num(l,k) = co(j,i,k)
                 k_num_all(l,k) = co(j,i,k)
+                k_x(l) = co(j,i,1)
+                k_y(l) = co(j,i,2)
+                k_z(l) = co(j,i,3)
+                if (k_x(l) .ne. k_num_all(l,1)) call neko_error("bwa")
+                if (k_y(l) .ne. k_num_all(l,2)) call neko_error("bwa")
+                if (k_z(l) .ne. k_num_all(l,3)) call neko_error("bwa")
              enddo
-             k_length = l
+
              shell(l) = i
-             !              shell2(l) = i
 
           endif ! if (.not.(0,0,0))
        end do ! j=1,2*Np
@@ -229,93 +185,8 @@ contains
     ! write(6,*) 'FST - (0,0,0) wavenumber removed'
     call neko_log%message('FST - (0,0,0) wavenumber removed')
 
-    write(log_buf, *) 'Saved ',z1,' of ',z1+z2, ' fst modes.'
+    write(log_buf, *) 'FST - Saved ',z1,' of ',z1+z2, ' fst modes.'
     call neko_log%message(log_buf)
-    !      close(12)
-
-    !     determine scaling according to the energy spectrum
-    !      write(6,2014) 'Shell No', 'Amp','No modes','Tot Energy'
-    ! 2014 format(A10,3x,A15,3x,A10,3x,A15)
-
-    tke_tot1 = 0.
-    do i=1,nshells
-       !write(*,*) "YEYEY", tke_shell(i), shell_modes(i)
-       shell_amp(i) = sqrt(2.*tke_shell(i)*2./ &
-            (real(shell_modes(i), kind=rp)))
-
-       shell_energy = real(shell_modes(i), kind=rp)* &
-            ((shell_amp(i)**2.))/2.
-
-       tke_tot1 = tke_tot1 + shell_energy
-
-       !         write(6,2013) i, shell_amp(i),shell_modes(i),
-       !     &      shell_energy
-    end do
-
-    ! 2013 format(i10,3x,E15.8E2,3x,i10,3x,E15.8E2)
-
-    !      open(ffst_ile='force.dat',unit=11)
-    !      write(11,*) 'energy spectrum parameters'
-    !      call writedat(11)
-    !      call hline(11)
-    !      write(11,'(a20,i18)') 'nshells',nshells
-    !      write(11,'(a20,i18)') 'Np',Np
-    !      write(11,'(a20,i18)') 'Neig',z1
-    !      write(11,'(a20,f18.9)') 'kstart',kstart
-    !      write(11,'(a20,f18.9)') 'kend',kend
-    !      write(11,'(a20,f18.9)') 'Lint',fst_il
-    !      write(11,'(a20,f18.9)') 'tke_tot',tke_tot
-    !!      write(11,'(a20,f18.9)') 'width',width
-    !      write(11,'(a20,f18.9)') 'etastart',etastart
-    !      write(11,'(a20,f18.9)') 'ymax',ymax
-    !      write(11,'(a20,f18.9)') 'tke_tot',1./tke_tot*1.5
-    !      write(11,'(a20,f18.9)') 'tke_tot1',1./tke_tot1*1.5
-
-    !      write(11,'(5a18)') '#Shell','#perShell','k','dk','E(k)'
-
-    !      start = 1.
-    !      do i=1,nshells
-    !         write(*,*) 'Scaling shell number ',i
-    !         write(*,*) '  k : ',kk(i)
-    !         write(*,*) '  q : ',q(i)
-    !         write(*,*) '  # : ',lu(i)
-    !         write(*,*) ' dk : ',kk(3)-kk(2)
-
-    !         write(11,'(2i5,3E18.9)') i,lu(i),kk(i),kk(3)-kk(2), q(i)
-
-    !         scf = 1./200.
-    !         scf = q(i)*(kk(3)-kk(2))/lu(i)         ! what is this?
-
-    !         shell1(i) = i                         ! not sure of the usage
-    !         nshell(i)= lu(i)
-    !         wn(i) = kk(i)
-    !         dwn(i) = kk(3)-kk(2)
-    !         spect(i) = q(i)
-    !         spect(i) = q(i)*dk(i)/tke_tot             ! prabal.
-
-    !      end do
-
-    !      close(11)
-
-    write (log_buf, *) 'FST - ',k_length,'wavenumbers generated'
-    call neko_log%message(log_buf)
-    ! 2012 format(A7,1x,i5,1x,A21)
-
-    call print_param('FST - Largest wavelength in x', 2.0*pi/kxmin)
-    call print_param('FST - Smallest wavelength in x', 2.0*pi/kxmax)
-    call print_param('FST - Largest wavelength in y', 2.0*pi/kymin)
-    call print_param('FST - Smallest wavelength in y', 2.0*pi/kymax)
-    call print_param('FST - Largest wavelength in z', 2.0*pi/kzmin)
-    call print_param('FST - Smallest wavelength in z', 2.0*pi/kzmax)
-
-    ! write(6,2015) 'FST - Largest wavelength in x',  2.0*pi/kxmin! ,kxmin
-    ! write(6,2016) 'FST - Smallest wavelength in x', 2.0*pi/kxmax! ,kxmax
-    ! write(6,2015) 'FST - Largest wavelength in y',  2.0*pi/kymin! ,kymin
-    ! write(6,2016) 'FST - Smallest wavelength in y', 2.0*pi/kymax! ,kymax
-    ! write(6,2015) 'FST - Largest wavelength in z',  2.0*pi/kzmin! ,kzmin
-    ! write(6,2016) 'FST - Smallest wavelength in z', 2.0*pi/kzmax! ,kzmax
-    ! 2015 format(A30,6x,E13.5E2)
-    ! 2016 format(A31,5x,E13.5E2)
 
     return
   end subroutine spec_s
@@ -787,6 +658,7 @@ contains
   end subroutine gen_bounded_k
   !----------------------------------------------------------------------
 
+  !> NOTE: This modifies the value of Np!
   subroutine gen_dodeca_k(kx,ky,kz,K_tot,Np,seed)
 
     real(kind=rp), intent(inout) :: kx(1),ky(1),kz(1)
@@ -794,10 +666,7 @@ contains
     integer, intent(inout) :: Np
     integer, intent(in) :: seed
 
-    real(kind=rp) :: pi
     real(kind=rp) :: rotx,roty,rotz
-
-    pi = 4.0*atan(1.0)
 
     rotx = ran2(seed)*2.*pi
     roty = ran2(seed)*2.*pi

@@ -56,10 +56,10 @@ contains
     type(json_file), intent(inout) :: params
 
     logical :: px, py, pz
-    real(kind=xp) :: x, ymin, ymax, zmin, zmax, delta_y, delta_z, Ly, Lz
-    real(kind=xp) :: ystart, yend, zstart, zend
-    integer :: i, ierr, seed
-    real(kind=xp) :: alpha, t_ramp, t_start
+    real(kind=rp) :: x, ymin, ymax, zmin, zmax, delta_y, delta_z, Ly, Lz
+    real(kind=rp) :: ystart, yend, zstart, zend
+    integer :: i, ierr
+    real(kind=rp) :: alpha
 
     call json_get_or_default(params, "case.FST.enabled", ENABLED, .true.)
 
@@ -135,19 +135,33 @@ contains
        delta_z = alpha * Lz
     end if
 
-    ! Read parameters for the FST fringe in time
-    call json_get(params, "case.FST.t_ramp", t_ramp)
-    call json_get_or_default(params, "case.FST.t_start", t_start, 0.0_rp)
+    !
+    ! Read all FST parameters
+    !
+    block
+      real(kind=rp) :: Uinf, Tu, L, k_start, k_end, t_ramp, t_start
+      integer :: Nshells, Npmax, seed
 
-    call json_get_or_default(params, "case.FST.seed", seed, -143)
+      call json_get_or_default(params, "case.FST.seed", seed, -143)
+      call json_get(params, "case.FST.Uinf", Uinf)
+      call json_get(params, "case.FST.Tu", Tu)
+      call json_get(params, "case.FST.L", L)
+      call json_get(params, "case.FST.k_start", k_start)
+      call json_get(params, "case.FST.k_end", k_end)
+      call json_get(params, "case.FST.n_shells", Nshells)
+      call json_get(params, "case.FST.n_pts_per_shell", Npmax)
 
-    ! Initialize the fst parameters
-    call FST_OBJ%init_bc(zmin, zmax, zstart, zend, &
-         delta_z, delta_z, &
-         ymin, ymax, ystart, yend, &
-         delta_y, delta_y, &
+      ! Read parameters for the FST fringe in time
+      call json_get_or_default(params, "case.FST.t_start", t_start, 0.0_rp)
+      call json_get(params, "case.FST.t_ramp", t_ramp)
+
+      call FST_OBJ%init_bc(Uinf, Tu, L, k_start, k_end, Nshells, Npmax, &
+         px, py, pz, zmin, zmax, zstart, zend, delta_z, delta_z, &
+         ymin, ymax, ystart, yend, delta_y, delta_y, 1.0_rp, &
          t_start, t_ramp, &
-         px, py, pz, seed)
+         seed)
+
+    end block
 
     call json_get_or_default(params, 'case.FST.files_output_path', PATH, &
          "./FST_output_files")

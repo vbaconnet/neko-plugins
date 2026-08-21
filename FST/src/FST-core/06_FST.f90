@@ -7,10 +7,11 @@
 module FST
 
   use, intrinsic :: iso_c_binding, only : c_ptr, C_NULL_PTR
-  use global_params
+  !use global_params
   use fst_operator, only: fst_bc_compute
   use turbu, only : make_turbu
-
+  use fst_utils, only : print_param
+  use logger, only: LOG_SIZE, neko_log
   use field, only: field_t
   use coefs, only: coef_t
   use num_types, only: rp
@@ -19,7 +20,7 @@ module FST
   use comm, only: pe_rank
   use math, only: masked_gather_copy_0
   use device_math, only: device_masked_gather_copy_0
-  use device, only: device_map, device_memcpy, HOST_TO_DEVICE
+  use device, only: device_map, device_memcpy, HOST_TO_DEVICE, device_unmap
   use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN, MPI_INTEGER, MPI_Bcast, &
       MPI_Allreduce
   use comm, only: MPI_REAL_PRECISION, NEKO_COMM
@@ -64,6 +65,45 @@ module FST
      logical :: is_forcing
      logical :: is_bc
 
+     ! ------- 
+     ! FST generation parameters
+     !> Free-stream velocity
+     real(kind=rp) :: Uinf
+     !> Turbulence intensity
+     real(kind=rp) :: Tu
+     !> Turbulent length scale
+     real(kind=rp) :: L
+     !> Number of shells
+     integer :: n_shells
+     !> Max number of points per shell
+     integer :: n_max_pts_per_shell
+     !> Start and end bounds of the total wavenumber range
+     real(kind=rp) :: k_start, k_end
+     !> Effective number of points per shell, usually equal to but sometimes 
+     !! lower than n_max_pts_per_shell
+     integer :: n_eff_pts_per_shell = 0
+     !> Total number of modes (2*n_shells*n_max_eff_per_shell)
+     integer :: n_modes = 0
+     
+     !> Random, divergence-free unit vectors
+     real(kind=rp), allocatable :: random_vectors(:,:) ! u_hat_pn but reshaped
+     type(c_ptr) :: random_vectors_d = C_NULL_PTR
+     !> Map to the total wavenumber id/shell
+     integer, allocatable :: shell(:)
+     type(c_ptr) :: shell_d = C_NULL_PTR
+     !> Amplitude of mode on a given shell
+     real(kind=rp), allocatable :: shell_amp(:)
+     type(c_ptr) :: shell_amp_d = C_NULL_PTR
+
+     !> Wavenumbers in the x,y,z direction
+     real(kind=rp), allocatable :: k_x(:)
+     real(kind=rp), allocatable :: k_y(:)
+     real(kind=rp), allocatable :: k_z(:)
+     type(c_ptr) :: k_x_d = C_NULL_PTR
+
+     real(kind=rp), allocatable :: phase_shifts(:)
+     ! -------
+
      !> Fringe in space
      real(kind=rp), allocatable :: fringe_space(:)
      type(c_ptr) :: fringe_space_d = C_NULL_PTR
@@ -80,32 +120,26 @@ module FST
      real(kind=rp), allocatable :: phi_0(:,:)
      type(c_ptr) :: phi_0_d = C_NULL_PTR
 
-     real(kind=rp), allocatable :: random_vectors(:,:) ! u_hat_pn but reshaped
-     type(c_ptr) :: random_vectors_d = C_NULL_PTR
-     type(c_ptr) :: u_hat_pn_d = C_NULL_PTR
-     type(c_ptr) :: shell_d = C_NULL_PTR
-     type(c_ptr) :: shell_amp_d = C_NULL_PTR
-
-     real(kind=rp), allocatable :: k_x(:)
-     type(c_ptr) :: k_x_d = C_NULL_PTR
    contains
 
      ! ======== Init/Free procedures
      procedure, pass(this) :: init_common => FST_init_common
      procedure, pass(this) :: init_bc => FST_init_bc
-     procedure, pass(this) :: init_forcing => FST_init_forcing
-     procedure, pass(this) :: free => FST_free_params
+     !procedure, pass(this) :: init_forcing => FST_init_forcing
+     procedure, pass(this) :: unmap => FST_unmap
+     procedure, pass(this) :: free => FST_free
+   !   procedure, pass(this) :: validate => FST_validate
      ! =========================================================================
      procedure, pass(this) :: apply_baseflow => FST_apply_baseflow
      procedure, pass(this) :: apply_baseflow_0 => FST_apply_baseflow_0
      ! =========================================================================
      ! ======== Generate FST
      procedure, pass(this) :: generate_common => FST_generate_common
-     procedure, pass(this) :: generate_forcing => FST_generate_forcing
+     !procedure, pass(this) :: generate_forcing => FST_generate_forcing
      procedure, pass(this) :: generate_bc => FST_generate_bc
      ! =========================================================================
      ! ======= Apply FST forcing/BC
-     procedure, pass(this) :: apply_forcing => FST_forcing_zone
+   !   procedure, pass(this) :: apply_forcing => FST_forcing_zone
      procedure, pass(this) :: apply_BC => FST_apply_BC
      ! ========================================================================
      procedure, pass(this) :: print => FST_print_params
@@ -115,30 +149,38 @@ contains
 
   !> Initialize all parameters
   subroutine FST_init_common(this, &
+       Uinf, Tu, L, k_start, k_end, Nshells, Npmax, &
+       periodic_x, periodic_y, periodic_z, &
        xmin, xmax, xstart, xend, x_delta_rise, x_delta_fall, &
        ymin, ymax, ystart, yend, y_delta_rise, y_delta_fall, &
        fringe_max, &
-       t_start, t_end, &
-       periodic_x, periodic_y, periodic_z, &
+       t_start, t_ramp, &
        seed)
     class(FST_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: xmin, xmax, xstart
-    real(kind=rp), intent(in) :: xend
-    real(kind=rp), intent(in) :: ymin, ymax, ystart
-    real(kind=rp), intent(in) :: yend
-    real(kind=rp), intent(in) :: x_delta_rise
-    real(kind=rp), intent(in) :: x_delta_fall
-    real(kind=rp), intent(in) :: y_delta_rise
-    real(kind=rp), intent(in) :: y_delta_fall
+    real(kind=rp), intent(in) :: Uinf, Tu, L, k_start, k_end
+    integer, intent(in) :: Nshells, Npmax
+    real(kind=rp), intent(in) :: xmin, xmax, xstart, xend
+    real(kind=rp), intent(in) :: ymin, ymax, ystart, yend
+    real(kind=rp), intent(in) :: x_delta_rise, x_delta_fall
+    real(kind=rp), intent(in) :: y_delta_rise, y_delta_fall
     real(kind=rp), intent(in) :: fringe_max
     real(kind=rp), intent(in) :: t_start
-    real(kind=rp), intent(in) :: t_end
+    real(kind=rp), intent(in) :: t_ramp
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
     integer, intent(inout), optional :: seed
 
     integer :: seed_ = -143
     if (present(seed)) seed_ = seed
     this%seed = seed_
+
+    this%Uinf = Uinf
+    this%Tu = Tu
+    this%L = L
+    this%k_start = k_start
+    this%k_end = k_end
+
+    this%n_shells = Nshells
+    this%n_max_pts_per_shell = Npmax
 
     this%periodic_x = periodic_x
     this%periodic_y = periodic_y
@@ -159,62 +201,66 @@ contains
     this%x_delta_fall = x_delta_fall!0.002
     this%y_delta_rise = y_delta_rise!0.002
     this%y_delta_fall = y_delta_fall!0.002
-    this%t_end = t_end
     this%t_start = t_start
+    this%t_end = t_start + t_ramp
 
   end subroutine FST_init_common
 
 
   !> Initialize the FST to use with forcing.
-  subroutine FST_init_forcing(this, &
-       xstart, xend, x_delta_rise, x_delta_fall, &
-       ystart, yend, y_delta_rise, y_delta_fall, &
-       fringe_max, &
-       t_start, t_end, &
-       periodic_x, periodic_y, periodic_z)
+!   subroutine FST_init_forcing(this, &
+!        xstart, xend, x_delta_rise, x_delta_fall, &
+!        ystart, yend, y_delta_rise, y_delta_fall, &
+!        fringe_max, &
+!        t_start, t_end, &
+!        periodic_x, periodic_y, periodic_z)
 
-    class(FST_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: xstart
-    real(kind=rp), intent(in) :: xend
-    real(kind=rp), intent(in) :: ystart
-    real(kind=rp), intent(in) :: yend
-    real(kind=rp), intent(in) :: x_delta_rise
-    real(kind=rp), intent(in) :: x_delta_fall
-    real(kind=rp), intent(in) :: y_delta_rise
-    real(kind=rp), intent(in) :: y_delta_fall
-    real(kind=rp), intent(in) :: fringe_max
-    real(kind=rp), intent(in) :: t_start
-    real(kind=rp), intent(in) :: t_end
-    logical, intent(in) :: periodic_x, periodic_y, periodic_z
+!     class(FST_t), intent(inout) :: this
+!     real(kind=rp), intent(in) :: xstart
+!     real(kind=rp), intent(in) :: xend
+!     real(kind=rp), intent(in) :: ystart
+!     real(kind=rp), intent(in) :: yend
+!     real(kind=rp), intent(in) :: x_delta_rise
+!     real(kind=rp), intent(in) :: x_delta_fall
+!     real(kind=rp), intent(in) :: y_delta_rise
+!     real(kind=rp), intent(in) :: y_delta_fall
+!     real(kind=rp), intent(in) :: fringe_max
+!     real(kind=rp), intent(in) :: t_start
+!     real(kind=rp), intent(in) :: t_end
+!     logical, intent(in) :: periodic_x, periodic_y, periodic_z
 
-    call neko_log%section('Initializing FST')
+!     call neko_log%section('Initializing FST')
 
-    call this%init_common(xstart, xend,xstart,xend,x_delta_rise, x_delta_fall, ystart, &
-         yend, ystart, yend, y_delta_rise, y_delta_fall, fringe_max, t_start, t_end, &
-         periodic_x, periodic_y, periodic_z)
+!     call this%init_common(xstart, xend,xstart,xend,x_delta_rise, x_delta_fall, ystart, &
+!          yend, ystart, yend, y_delta_rise, y_delta_fall, fringe_max, t_start, t_end, &
+!          periodic_x, periodic_y, periodic_z)
 
-    call this%print() ! show parameters
-    call neko_log%end_section('Done --> Intializing FST')
+!     call this%print() ! show parameters
+!     call neko_log%end_section('Done --> Intializing FST')
 
-    this%is_forcing = .true.
-    this%is_bc = .false.
+!     this%is_forcing = .true.
+!     this%is_bc = .false.
 
-  end subroutine FST_init_forcing
+!   end subroutine FST_init_forcing
 
   !> Initialize the FST to use as a boundary condition
   subroutine FST_init_bc(this, &
+       Uinf, Tu, L, k_start, k_end, Nshells, Npmax, &
+       periodic_x, periodic_y, periodic_z, &
        xmin, xmax, xstart, xend, x_delta_rise, x_delta_fall, &
        ymin, ymax, ystart, yend, y_delta_rise, y_delta_fall, &
+       fringe_max, &
        t_start, t_end, &
-       periodic_x, periodic_y, periodic_z, seed)
+       seed)
 
     class(FST_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: xstart, xend, xmin, xmax
-    real(kind=rp), intent(in) :: ystart, yend, ymin, ymax
-    real(kind=rp), intent(in) :: x_delta_rise
-    real(kind=rp), intent(in) :: x_delta_fall
-    real(kind=rp), intent(in) :: y_delta_rise
-    real(kind=rp), intent(in) :: y_delta_fall
+    real(kind=rp), intent(in) :: Uinf, Tu, L, k_start, k_end
+    integer, intent(in) :: Nshells, Npmax
+    real(kind=rp), intent(in) :: xmin, xmax, xstart, xend
+    real(kind=rp), intent(in) :: ymin, ymax, ystart, yend
+    real(kind=rp), intent(in) :: x_delta_rise, x_delta_fall
+    real(kind=rp), intent(in) :: y_delta_rise, y_delta_fall
+    real(kind=rp), intent(in) :: fringe_max
     real(kind=rp), intent(in) :: t_start
     real(kind=rp), intent(in) :: t_end
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
@@ -222,10 +268,13 @@ contains
 
     call neko_log%section('Initializing FST')
 
-    call this%init_common(xmin, xmax, xstart, xend, x_delta_rise, &
-         x_delta_fall, ymin, ymax, ystart, yend, y_delta_rise, &
-         y_delta_fall, 1.0_rp, t_start, t_end, &
-         periodic_x, periodic_y, periodic_z, seed)
+    call this%init_common(Uinf, Tu, L, k_start, k_end, Nshells, Npmax, &
+       periodic_x, periodic_y, periodic_z, &
+       xmin, xmax, xstart, xend, x_delta_rise, x_delta_fall, &
+       ymin, ymax, ystart, yend, y_delta_rise, y_delta_fall, &
+       fringe_max, &
+       t_start, t_end, &
+       seed)
 
     call this%print() ! show parameters
     call neko_log%end_section('Done --> Intializing FST')
@@ -235,28 +284,55 @@ contains
 
   end subroutine FST_init_bc
 
-  !! Free parameters in global params
-  subroutine FST_free_params(this)
+  !> Unmap device arrays
+  subroutine FST_unmap(this)
     class(FST_t), intent(inout) :: this
 
-    if(allocated(this%fringe_space)) deallocate(this%fringe_space)
-    if(allocated(this%phi_0)) deallocate(this%phi_0)
+    if (allocated(this%random_vectors)) call device_unmap(this%random_vectors, this%random_vectors_d)
+    if (allocated(this%k_x)) call device_unmap(this%k_x, this%k_x_d)
+    if (allocated(this%fringe_space)) call device_unmap(this%fringe_space, this%fringe_space_d)
+    if (allocated(this%shell)) call device_unmap(this%shell, this%shell_d)
+    if (allocated(this%shell_amp)) call device_unmap(this%shell_amp, this%shell_amp_d)
+    if (allocated(this%u_baseflow)) call device_unmap(this%u_baseflow, this%u_baseflow_d)
+    if (allocated(this%v_baseflow)) call device_unmap(this%v_baseflow, this%v_baseflow_d)
+    if (allocated(this%w_baseflow)) call device_unmap(this%w_baseflow, this%w_baseflow_d)
 
+  end subroutine FST_unmap
+
+  !! Free parameters in global params
+  subroutine FST_free(this)
+    class(FST_t), intent(inout) :: this
+
+    if (NEKO_BCKND_DEVICE .eq. 1) call this%unmap()
+
+    if (allocated(this%fringe_space)) deallocate(this%fringe_space)
+    if (allocated(this%phi_0)) deallocate(this%phi_0)
     if (allocated(this%u_baseflow)) deallocate(this%u_baseflow)
     if (allocated(this%v_baseflow)) deallocate(this%v_baseflow)
     if (allocated(this%w_baseflow)) deallocate(this%w_baseflow)
+    if (allocated(this%random_vectors)) deallocate(this%random_vectors)
+    if (allocated(this%phase_shifts)) deallocate(this%phase_shifts)
+    if (allocated(this%k_x)) deallocate(this%k_x)
+    if (allocated(this%k_y)) deallocate(this%k_y)
+    if (allocated(this%k_z)) deallocate(this%k_z)
+    if (allocated(this%shell)) deallocate(this%shell)
+    if (allocated(this%shell_amp)) deallocate(this%shell_amp)
 
-  end subroutine FST_free_params
+  end subroutine FST_free
 
   subroutine FST_print_params(this)
     class(FST_t) :: this
 
-    call print_param("nshells", real(nshells, kind=rp))
-    call print_param("Npmax", real(Npmax, kind=rp))
-    call print_param("fst_ti", fst_ti)
-    call print_param("fst_il", fst_il)
-    call print_param("kstart", kstart)
-    call print_param("kend", kend)
+    call neko_log%message("--- FST Generation ---")
+    call print_param("# of shells", real(this%n_shells, kind=rp))
+    call print_param("max # points per shell", real(this%n_max_pts_per_shell, kind=rp))
+    call print_param("Turb. intensity", this%Tu)
+    call print_param("Turb. length scale", this%L)
+    call print_param("k_start", this%k_start)
+    call print_param("k_end", this%k_end)
+    call print_param("seed", real(this%seed, kind=rp))
+    
+    call neko_log%message("--- Fringe ---")
     call print_param("xmin", this%xmin)
     call print_param("xmax", this%xmax)
     call print_param("xstart", this%xstart)
@@ -271,7 +347,7 @@ contains
     call print_param("y_delta_rise", this%y_delta_rise)
     call print_param("y_delta_fall", this%y_delta_fall)
     call print_param("t_start", this%t_start)
-    call print_param("seed", real(this%seed, kind=rp))
+    call print_param("t_end", this%t_end)
 
   end subroutine FST_print_params
 
@@ -359,23 +435,15 @@ contains
     integer :: ierr
 
     call neko_log%section ('Generating FST')
-    call make_turbu(coef, this%periodic_x, this%periodic_y, this%periodic_z, &
-         this%seed, path, Lx, Ly, Lz)
 
-    call MPI_Bcast(k_length , 1 , &
-         MPI_INTEGER , 0, NEKO_COMM, ierr)
-    call MPI_Bcast(k_num_all, fst_modes*coef%msh%gdim, &
-         MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
-    call MPI_Bcast(k_num , fst_modes*coef%msh%gdim, &
-         MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
-    call MPI_Bcast(u_hat_pn , fst_modes*coef%msh%gdim, &
-         MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
-    call MPI_Bcast(bb , fst_modes*coef%msh%gdim, &
-         MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
-    call MPI_Bcast(shell , fst_modes , &
-         MPI_INTEGER , 0, NEKO_COMM, ierr)
-    call MPI_Bcast(shell_amp, nshells , &
-         MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
+    ! NOTE: the generation is done on rank 0 and the data is broadcast
+    ! to al ranks
+    call make_turbu(this%phase_shifts, this%random_vectors, &
+      this%n_eff_pts_per_shell, this%L, this%Tu, this%Uinf, &
+      this%n_max_pts_per_shell, this%n_shells, this%k_start, this%k_end, &
+      this%k_x, this%k_y, this%k_z, this%n_modes, this%shell, &
+      this%shell_amp, this%periodic_x, this%periodic_y, this%periodic_z, &
+      this%seed, path, .true., coef, Lx, Ly, Lz)
 
     call neko_log%end_section('Done --> Generating FST')
 
@@ -505,34 +573,15 @@ contains
     !
     ! Precompute time-independent term
     !
-    allocate(this%phi_0(k_length, n))
+    allocate(this%phi_0(this%n_modes, n))
 
     do j = 1, n
        x = coef%dof%x(bc_mask(j), 1,1,1)
        y = coef%dof%y(bc_mask(j), 1,1,1)
        z = coef%dof%z(bc_mask(j), 1,1,1)
-       do m = 1, k_length
-          this%phi_0(m,j) = k_num_all(m,1)*x + k_num_all(m,2)*y + k_num_all(m,3)*z + bb(m,1) ! bb is phase_shift
-       end do
-    end do
-
-    !
-    ! Copy the wavenumbers in x direction
-    !
-    allocate(this%k_x(fst_modes))
-
-    do m = 1, fst_modes
-       this%k_x(m) = k_num_all(m,1)
-    end do
-
-    !
-    ! Copy a proper version of u_hat_pn with correct size
-    !
-    allocate(this%random_vectors(k_length, 3))
-
-    do m = 1, k_length
-       do j = 1, 3
-          this%random_vectors(m,j) = u_hat_pn(m,j)
+       do m = 1, this%n_modes
+          this%phi_0(m,j) = this%k_x(m)*x + this%k_y(m)*y + this%k_z(m)*z &
+               + this%phase_shifts(m)
        end do
     end do
 
@@ -542,24 +591,24 @@ contains
        call device_memcpy(this%fringe_space, this%fringe_space_d, n, &
             HOST_TO_DEVICE, .false.)
 
-       call device_map(this%phi_0, this%phi_0_d, k_length*n)
-       call device_memcpy(this%phi_0, this%phi_0_d, k_length*n, &
+       call device_map(this%phi_0, this%phi_0_d, this%n_modes*n)
+       call device_memcpy(this%phi_0, this%phi_0_d, this%n_modes*n, &
             HOST_TO_DEVICE, .false.)
 
-       call device_map(this%random_vectors, this%random_vectors_d, k_length*3)
-       call device_memcpy(this%random_vectors, this%random_vectors_d, k_length*3, &
+       call device_map(this%random_vectors, this%random_vectors_d, this%n_modes*3)
+       call device_memcpy(this%random_vectors, this%random_vectors_d, this%n_modes*3, &
             HOST_TO_DEVICE, .false.)
 
-       call device_map(shell, this%shell_d, fst_modes)
-       call device_memcpy(shell, this%shell_d, fst_modes, &
+       call device_map(this%shell, this%shell_d, this%n_modes)
+       call device_memcpy(this%shell, this%shell_d, this%n_modes, &
             HOST_TO_DEVICE, .false.)
 
-       call device_map(shell_amp, this%shell_amp_d, nshells)
-       call device_memcpy(shell_amp, this%shell_amp_d, nshells, &
+       call device_map(this%shell_amp, this%shell_amp_d, this%n_shells)
+       call device_memcpy(this%shell_amp, this%shell_amp_d, this%n_shells, &
             HOST_TO_DEVICE, .false.)
 
-       call device_map(this%k_x, this%k_x_d, fst_modes)
-       call device_memcpy(this%k_x, this%k_x_d, fst_modes, &
+       call device_map(this%k_x, this%k_x_d, this%n_modes)
+       call device_memcpy(this%k_x, this%k_x_d, this%n_modes, &
             HOST_TO_DEVICE, .true.)
     end if
 
@@ -568,65 +617,65 @@ contains
   ! Forcing to be performed on entire domain, on a local element ix
   ! Final values of the forcing are to be applied
   ! on f%u, f%v and f%w
-  subroutine FST_forcing_zone(this, zone, &
-       x, y, z, t, &
-       u, v, w, &
-       fu, fv, fw)
+!   subroutine FST_forcing_zone(this, zone, &
+!        x, y, z, t, &
+!        u, v, w, &
+!        fu, fv, fw)
 
-    class(FST_t), intent(in) :: this
-    class(point_zone_t), intent(in) :: zone
-    real(kind=rp), intent(in), dimension(:,:,:,:) :: x, y, z, u, v, w
-    real(kind=rp), intent(in) :: t
-    real(kind=rp), intent(inout), dimension(:,:,:,:) :: fu, fv, fw
+!     class(FST_t), intent(in) :: this
+!     class(point_zone_t), intent(in) :: zone
+!     real(kind=rp), intent(in), dimension(:,:,:,:) :: x, y, z, u, v, w
+!     real(kind=rp), intent(in) :: t
+!     real(kind=rp), intent(inout), dimension(:,:,:,:) :: fu, fv, fw
 
-    integer :: idx, l, m, i, shellno
-    integer, parameter :: gdim = 3
-    real(kind=rp) :: phase_shft, phi, amp, pert, vel_mag
-    real(kind=rp) :: rand_vec(gdim)
-    real(kind=rp) :: fringe_time
+!     integer :: idx, l, m, i, shellno
+!     integer, parameter :: gdim = 3
+!     real(kind=rp) :: phase_shft, phi, amp, pert, vel_mag
+!     real(kind=rp) :: rand_vec(gdim)
+!     real(kind=rp) :: fringe_time
 
-    integer, pointer :: mask(:)
-    mask => zone%mask%get()
+!     integer, pointer :: mask(:)
+!     mask => zone%mask%get()
 
-    fringe_time = time_ramp(t, this%t_end, this%t_start)
+!     fringe_time = time_ramp(t, this%t_end, this%t_start)
 
-    ! Loop on all points in the point zone
-    do idx = 1, zone%size
-       i = mask(idx)
+!     ! Loop on all points in the point zone
+!     do idx = 1, zone%size
+!        i = mask(idx)
 
-       !> This vector will contain the sum of all Fourier modes
-       rand_vec = 0.0_rp
+!        !> This vector will contain the sum of all Fourier modes
+!        rand_vec = 0.0_rp
 
-       ! Sum all sin modes for each gll point
-       do m = 1, k_length
-          phase_shft = bb(m,1)
+!        ! Sum all sin modes for each gll point
+!        do m = 1, this%n_modes
+!           phase_shft = bb(m,1)
 
-          ! kx(x - U*t) + ky*y + kz*z - random_phase[-pi, pi]
-          ! = kx*x + ky*y + kz*z - kx*U*t - random_phase
-          phi = k_num_all(m,1) * (x(i,1,1,1) - glb_uinf*t) + &
-               k_num_all(m,2) * y(i,1,1,1) + &
-               k_num_all(m,3) * z(i,1,1,1) + &
-               phase_shft
+!           ! kx(x - U*t) + ky*y + kz*z - random_phase[-pi, pi]
+!           ! = kx*x + ky*y + kz*z - kx*U*t - random_phase
+!           phi = k_num_all(m,1) * (x(i,1,1,1) - glb_uinf*t) + &
+!                k_num_all(m,2) * y(i,1,1,1) + &
+!                k_num_all(m,3) * z(i,1,1,1) + &
+!                phase_shft
 
-          shellno = shell(m)
-          pert = shell_amp(shellno)*sin(phi)
+!           shellno = shell(m)
+!           pert = shell_amp(shellno)*sin(phi)
 
-          rand_vec(1) = rand_vec(1) + u_hat_pn(m,1)*pert
-          rand_vec(2) = rand_vec(2) + u_hat_pn(m,2)*pert
-          rand_vec(3) = rand_vec(3) + u_hat_pn(m,3)*pert
-       enddo
+!           rand_vec(1) = rand_vec(1) + u_hat_pn(m,1)*pert
+!           rand_vec(2) = rand_vec(2) + u_hat_pn(m,2)*pert
+!           rand_vec(3) = rand_vec(3) + u_hat_pn(m,3)*pert
+!        enddo
 
-       fu(i,1,1,1) = fringe_time*this%fringe_space(idx)*( &
-            this%u_baseflow(idx) + rand_vec(1) - u(i,1,1,1))
+!        fu(i,1,1,1) = fringe_time*this%fringe_space(idx)*( &
+!             this%u_baseflow(idx) + rand_vec(1) - u(i,1,1,1))
 
-       fv(i,1,1,1) = fringe_time*this%fringe_space(idx)*( &
-            this%v_baseflow(idx) + rand_vec(2) - v(i,1,1,1))
+!        fv(i,1,1,1) = fringe_time*this%fringe_space(idx)*( &
+!             this%v_baseflow(idx) + rand_vec(2) - v(i,1,1,1))
 
-       fw(i,1,1,1) = fringe_time*this%fringe_space(idx)*( &
-            this%w_baseflow(idx) + rand_vec(3) - w(i,1,1,1))
-    end do
+!        fw(i,1,1,1) = fringe_time*this%fringe_space(idx)*( &
+!             this%w_baseflow(idx) + rand_vec(3) - w(i,1,1,1))
+!     end do
 
-  end subroutine FST_forcing_zone
+!   end subroutine FST_forcing_zone
 
   ! Apply FST as a boundary condition based on the bc mask
   ! Assumes that u,v,w have the same bc masks
@@ -654,9 +703,9 @@ contains
     cosa = cos(angleXY)
     sina = sin(angleXY)
 
-    call fst_bc_compute(t, glb_uinf,u_bc, v_bc, w_bc, bc_mask, n, &
+    call fst_bc_compute(t, this%Uinf, u_bc, v_bc, w_bc, bc_mask, n, &
          this%u_baseflow, this%v_baseflow, this%w_baseflow, &
-         this%k_x, k_length, this%phi_0, shell, shell_amp, &
+         this%k_x, this%n_modes, this%phi_0, this%shell, this%shell_amp, &
          this%random_vectors, angleXY, fringe_time, this%fringe_space, on_host)
 
 !!$    phi_t = glb_uinf*t
@@ -669,7 +718,7 @@ contains
 !!$       rand_vec = 0.0_rp
 !!$
 !!$       ! Sum all sin modes for each gll point
-!!$       do m = 1, k_length
+!!$       do m = 1, this%n_modes
 !!$
 !!$          ! Random phase shifts
 !!$          !phase_shft = bb(m,1)
