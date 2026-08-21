@@ -3,7 +3,7 @@
   "case":
   {
     "mesh_file": "box.nmsh",
-    "output_directory": "results",
+    "output_directory": "results_alloc",
     "output_at_end": true,
     "output_checkpoints": false,
     "output_boundary": false,
@@ -30,7 +30,7 @@
       "Uinf": 1.0,
       "Tu": 3.7e-2,
       "L": 11.53e-3,
-      "k_start": 43.77,
+      "k_start": 63.77,
       "k_end": 1660.0,
       "n_shells": 80,
       "n_pts_per_shell": 40,
@@ -68,7 +68,7 @@
         "max_iterations": 50
       },
       "output_control": "tsteps",
-      "output_value": 10,
+      "output_value": 1,
       "boundary_conditions": 
       [
         {

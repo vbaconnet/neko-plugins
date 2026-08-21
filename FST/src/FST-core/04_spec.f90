@@ -27,8 +27,8 @@ contains
     integer, intent(in) :: Npmax
     integer, intent(in) :: Nshells
     real(kind=rp), intent(in) :: k_start, k_end
-    real(kind=rp), dimension(2*Npmax*Nshells), intent(inout) :: k_x, k_y, k_z
-    integer, intent(inout) :: shell(2*Npmax*Nshells)
+    real(kind=rp), allocatable, intent(inout) :: k_x(:), k_y(:), k_z(:)
+    integer, allocatable, intent(inout) :: shell(:)
     real(kind=rp), intent(inout) :: shell_amp(nshells)
     real(kind=rp), intent(in) :: dlx, dly, dlz
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
@@ -115,20 +115,31 @@ contains
     call print_param("Truncated TKE",tke_scaled/tke_tot)
 
     !
-    ! Generate the wavenumbers
+    ! Generate the wavenumbers, this will also give us a definitive value for
+    ! Np
     !
     do i=1,nshells
 
-       kk(i) = sqrt(k_start + (i-1)*(k_end - k_start)/real(nshells-1, kind=rp)) ! kk = k_start, k_start+dk, k_start+2dk + ... + k_end
+       kk(i) = k_start + (i-1)*(k_end - k_start)/real(nshells-1, kind=rp) ! kk = k_start, k_start+dk, k_start+2dk + ... + k_end
 
-       print *, ">> BEFORE", Np
        ! Fill            co(1:Np,i,1), co(1:Np,i,2), co(1:Np,i,3)
        call gen_dodeca_k(co(1,i,1), co(1,i,2), co(1,i,3), &
             kk(i),Np,seed)
        Npeff = Np
-       print *, ">> AFTER", Np
+    end do
+    
+    !
+    ! Allocate the arrays here because they will be filled below
+    !
+    allocate(k_x(Np*2*nshells))
+    allocate(k_y(Np*2*nshells))
+    allocate(k_z(Np*2*nshells))
+    allocate(shell(Np*2*nshells))
 
-       ! Recompute wavenumbers in the periodic directions
+    !
+    ! Recompute wavenumbers in the periodic directions
+    !
+    do i=1,nshells
        call periodicity_chk(co(1,i,1),co(1,i,2),co(1,i,3), &
             Np,kk(i),dlx,dly,dlz, periodic_x, periodic_y, periodic_z, seed)
 
@@ -169,6 +180,8 @@ contains
              do k=1,3
                 k_num(l,k) = co(j,i,k)
                 k_num_all(l,k) = co(j,i,k)
+             end do
+             do k = 1,3
                 k_x(l) = co(j,i,1)
                 k_y(l) = co(j,i,2)
                 k_z(l) = co(j,i,3)

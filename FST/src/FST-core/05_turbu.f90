@@ -86,6 +86,7 @@ contains
        ! Generate wavenumbers distributed on spheres
        ! note that Npmax may get modified
        ! 
+       print *, "> kstart", k_start, k_end
        call spec_s(Npeff, IL, Tu, U_inf, Npmax, Nshells, k_start, k_end, &
          k_x, k_y, k_z, shell, shell_amp, dlx, dly, dlz, periodic_x, periodic_y, &
          periodic_z, seed, write_file_path, write_files) ! get isotropically distributed wavenumbers in spheres
@@ -99,11 +100,7 @@ contains
     !
     call MPI_Bcast(n_modes, 1, MPI_INTEGER, 0, NEKO_COMM, ierr)
 
-    allocate(k_x(n_modes))
-    allocate(k_y(n_modes))
-    allocate(k_z(n_modes))
     allocate(phase_shifts(n_modes))
-    allocate(shell(n_modes))
     allocate(shell_amp(n_modes))
     allocate(random_vectors(n_modes,3))
 

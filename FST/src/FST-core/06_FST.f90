@@ -540,6 +540,8 @@ contains
     Ly = ymax - ymin
     Lz = zmax - zmin
 
+    print *, ">>> Ly, LZ", Ly, Lz
+
     !
     ! Do the common generation (not passing Lx since it is not supported yet)
     !
