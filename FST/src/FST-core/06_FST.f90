@@ -431,10 +431,10 @@ contains
   end subroutine FST_apply_baseflow
 
   !> Common function for generation
-  subroutine FST_generate_common(this, coef, path, Lx, Ly, Lz)
+  subroutine FST_generate_common(this, path, gdim, Lx, Ly, Lz)
     class(FST_t), intent(inout) :: this
-    type(coef_t), intent(in) :: coef
     character(len=*), intent(in) :: path
+    integer, intent(in) :: gdim
     real(kind=rp), intent(in), optional :: Lx, Ly, Lz
 
     integer :: ierr
@@ -448,9 +448,9 @@ contains
       this%n_max_pts_per_shell, this%n_shells, this%k_start, this%k_end, &
       this%k_x, this%k_y, this%k_z, this%n_modes, this%shell, &
       this%shell_amp, this%periodic_x, this%periodic_y, this%periodic_z, &
-      this%seed, path, .true., coef, Lx, Ly, Lz)
+      this%seed, path, .true., gdim, Lx, Ly, Lz)
 
-    call neko_log%end_section('Done --> Generating FST')
+    call neko_log%end_section('Done generating FST')
 
   end subroutine FST_generate_common
 
@@ -468,7 +468,7 @@ contains
     integer, pointer :: mask(:)
 
     ! Do the general generation
-    call this%generate_common(coef, path)
+    call this%generate_common(path, coef%msh%gdim)
 
     !
     ! Copy the baseflow in the zone
@@ -497,13 +497,15 @@ contains
   end subroutine FST_generate_forcing
 
   !> Do the generation for BC.
-  subroutine FST_generate_bc(this, coef, bc_mask, n, u, v, w, path)
+  subroutine FST_generate_bc(this, x_dof, y_dof, z_dof, bc_mask, n, u, v, w, &
+      path, gdim)
     class(FST_t), intent(inout) :: this
-    type(coef_t), intent(in) :: coef
+    real(kind=rp), intent(in) :: x_dof(:,:,:,:), y_dof(:,:,:,:), z_dof(:,:,:,:)
     integer, intent(in) :: bc_mask(0:n)
     integer, intent(in) :: n
     type(field_t), intent(in) :: u, v, w
     character(len=*), intent(in) :: path
+    integer, intent(in) :: gdim
 
     character(len=LOG_SIZE) :: log_buf
     real(kind=rp) :: x, y, z, xmin, xmax, ymin, ymax, zmin, zmax, Lx, Ly, Lz
@@ -520,12 +522,12 @@ contains
     zmin =  huge(1.0_rp)
     do idx = 1, n
       i = bc_mask(idx)
-      xmin = min(xmin, coef%dof%x(i,1,1,1))
-      xmax = max(xmax, coef%dof%x(i,1,1,1))
-      ymin = min(ymin, coef%dof%y(i,1,1,1))
-      ymax = max(ymax, coef%dof%y(i,1,1,1))
-      zmin = min(zmin, coef%dof%z(i,1,1,1))
-      zmax = max(zmax, coef%dof%z(i,1,1,1))
+      xmin = min(xmin, x_dof(i,1,1,1))
+      xmax = max(xmax, x_dof(i,1,1,1))
+      ymin = min(ymin, y_dof(i,1,1,1))
+      ymax = max(ymax, y_dof(i,1,1,1))
+      zmin = min(zmin, z_dof(i,1,1,1))
+      zmax = max(zmax, z_dof(i,1,1,1))
     end do
 
     call MPI_Allreduce(MPI_IN_PLACE, xmin, 1, &
@@ -545,12 +547,10 @@ contains
     Ly = ymax - ymin
     Lz = zmax - zmin
 
-    print *, ">>> Ly, LZ", Ly, Lz
-
     !
     ! Do the common generation (not passing Lx since it is not supported yet)
     !
-    call this%generate_common(coef, path, Ly=Ly, Lz=Lz)
+    call this%generate_common(path, gdim, Lx=Lx, Ly=Ly, Lz=Lz)
 
     !
     ! Apply baseflow in the bc zone
@@ -564,9 +564,9 @@ contains
     do idx = 1, size(this%fringe_space)
 
        i = bc_mask(idx)
-       x = coef%dof%x(i,1,1,1)
-       y = coef%dof%y(i,1,1,1)
-       z = coef%dof%z(i,1,1,1)
+       x = x_dof(i,1,1,1)
+       y = y_dof(i,1,1,1)
+       z = z_dof(i,1,1,1)
 
        if ( z .lt. this%xmin .or. z .gt. this%xmax .or. &
             y .lt. this%ymin .or. y .gt. this%ymax ) then
@@ -583,9 +583,9 @@ contains
     allocate(this%phi_0(this%n_modes, n))
 
     do j = 1, n
-       x = coef%dof%x(bc_mask(j), 1,1,1)
-       y = coef%dof%y(bc_mask(j), 1,1,1)
-       z = coef%dof%z(bc_mask(j), 1,1,1)
+       x = x_dof(bc_mask(j), 1,1,1)
+       y = y_dof(bc_mask(j), 1,1,1)
+       z = z_dof(bc_mask(j), 1,1,1)
        do m = 1, this%n_modes
           this%phi_0(m,j) = this%k_x(m)*x + this%k_y(m)*y + this%k_z(m)*z &
                + this%phase_shifts(m)

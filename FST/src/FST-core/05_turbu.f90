@@ -1,7 +1,8 @@
 module turbu
   use num_types, only: rp
   use fst_utils, only : ran2
-  use math, only: glmax, glmin, pi 
+  use math, only: pi, abscmp
+  use utils, only: neko_error
   use logger, only: LOG_SIZE, neko_log
   use coefs, only: coef_t
   use spec, only: spec_s
@@ -17,7 +18,7 @@ contains
 
   subroutine make_turbu(phase_shifts, random_vectors, Npeff, IL, Tu, U_inf, Npmax, Nshells, k_start, k_end, &
        k_x, k_y, k_z, n_modes, shell, shell_amp, periodic_x, periodic_y, &
-       periodic_z, seed, write_file_path, write_files, coef, Lx, Ly, Lz)
+       periodic_z, seed, write_file_path, write_files, gdim, Lx, Ly, Lz)
     
     real(kind=rp), allocatable :: phase_shifts(:)
     real(kind=rp), allocatable :: random_vectors(:,:)
@@ -34,44 +35,23 @@ contains
     integer, intent(inout) :: seed
     character(len=*), intent(in) :: write_file_path
     logical, intent(in) :: write_files
-    type(coef_t), intent(in) :: coef
+    integer, intent(in) :: gdim
     real(kind=rp), intent(in), optional :: Lx, Ly, Lz
 
     integer :: k,i,j, ierr
     integer :: shellno
     real(kind=rp) :: ue,ve,we
     real(kind=rp) :: uamp,vamp,wamp, u_dot_k, norm_ki
-    real(kind=rp) :: amp, dlx, dly, dlz
+    real(kind=rp) :: amp
     real(kind=rp) :: u_hat(3), u_hat_p(3)
     character(len=LOG_SIZE) :: log_buf
 
-    if (present(Lx)) then
-      dlx = Lx
-      write (log_buf, *) "[FST] Length in x: ", dlx
-      call neko_log%message(log_buf)
-    else
-      dlx = glmax(coef%dof%x, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv) - &
-          glmin(coef%dof%x, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv)
-    end if
-
-    if (present(Ly)) then
-      dly = Ly
-      write (log_buf, *) "[FST] Length in y: ", dly
-      call neko_log%message(log_buf)
-    else
-      dly = glmax(coef%dof%y, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv) - &
-          glmin(coef%dof%y, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv)
-    end if
-
-    if (present(Lz)) then
-      dlz = Lz
-      write (log_buf, *) "[FST] Length in z: ", dlz
-      call neko_log%message(log_buf)
-    else
-      dlz = glmax(coef%dof%z, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv) - &
-          glmin(coef%dof%z, coef%Xh%lx * coef%Xh%ly * coef%Xh%lz * coef%msh%nelv)
-    end if
-
+    if (periodic_x .and. abscmp(Lx, 0.0_rp)) &
+      call neko_error("Periodic in x requested but total length is zero!")
+    if (periodic_y .and. abscmp(Ly, 0.0_rp)) &
+      call neko_error("Periodic in y requested but total length is zero!")
+    if (periodic_z .and. abscmp(Lz, 0.0_rp)) &
+      call neko_error("Periodic in z requested but total length is zero!")
 
     !
     ! Generate wavenumbers on rank 0
@@ -90,7 +70,7 @@ contains
        ! these arrays! That is why after the end if we allocate the arrays on
        ! all other ranks.
        call spec_s(Npeff, IL, Tu, U_inf, Npmax, Nshells, k_start, k_end, &
-         k_x, k_y, k_z, shell, shell_amp, dlx, dly, dlz, periodic_x, periodic_y, &
+         k_x, k_y, k_z, shell, shell_amp, Lx, Ly, Lz, periodic_x, periodic_y, &
          periodic_z, seed, write_file_path, write_files) ! get isotropically distributed wavenumbers in spheres
 
        ! This will be the total size of our arrays
@@ -116,14 +96,14 @@ contains
          ! Temporary arrays for random generation
          real(kind=rp) :: bb(2*Npmax*Nshells, 3), bb1(2*Npmax*Nshells, 3)
 
-         do k=1,coef%msh%gdim
+         do k=1, gdim
 
             ! this loop should be done with Npeff instead BUT we keep it this way
             ! so the ran2 function is called the exact same number of times as the
             ! original code
             do i=1,2*Npmax*Nshells 
 
-               bb(i,k) = ran2(seed)*2.0*pi ! random phase shift
+               bb(i,k) = ran2(seed)*2.0_rp*pi ! random phase shift
 
                ! Load phase_shifts, but careful with the bounds
                ! if Npmax < Np, we risk overflow
@@ -146,7 +126,7 @@ contains
        do i = 1, n_modes
 
           ! u_hat stores the random amplitudes between 0 and 1
-          do j = 1, coef%msh%gdim
+          do j = 1,  gdim
              u_hat(j) = bb1(i,j)
           enddo
 
@@ -159,7 +139,7 @@ contains
           u_hat_p(3) = u_hat(3) - k_z(i) * u_dot_k / norm_ki
 
           ! Finally, normalize so the vectors are unitary
-          do j=1,coef%msh%gdim
+          do j=1, gdim
              random_vectors(i,j) = u_hat_p(j) &
                   / sqrt(u_hat_p(1)**2 &
                   + u_hat_p(2)**2 &

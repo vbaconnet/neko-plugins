@@ -189,7 +189,8 @@ contains
     ! on the boundry mask!
     !
     if (.not. FST_GENERATED) then
-       call FST_obj%generate_bc(coef, bc%msk, bc%msk(0), u, v, w, PATH)
+       call FST_obj%generate_bc(coef%dof%x, coef%dof%y, coef%dof%z, bc%msk, &
+         bc%msk(0), u, v, w, PATH, coef%msh%gdim)
        FST_GENERATED = .true.
     end if
 

@@ -81,7 +81,6 @@ contains
        call gen_dodeca_k(co(:,i,1), co(:,i,2), co(:,i,3), &
             kk(i),Np,seed)
        Npeff = Np
-       print *, Np, Npeff, Npmax
     end do
     
     !
