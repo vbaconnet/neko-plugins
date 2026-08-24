@@ -78,7 +78,7 @@ contains
        kk(i) = k_start + (i-1)*dk ! kk = k_start, k_start+dk, k_start+2dk + ... + k_end
 
        ! Fill            co(1:Np,i,1), co(1:Np,i,2), co(1:Np,i,3)
-       call gen_dodeca_k(co(1,i,1), co(1,i,2), co(1,i,3), &
+       call gen_dodeca_k(co(:,i,1), co(:,i,2), co(:,i,3), &
             kk(i),Np,seed)
        Npeff = Np
        print *, Np, Npeff, Npmax
@@ -109,8 +109,8 @@ contains
     ! Recompute wavenumbers in the periodic directions
     !
     do i=1,nshells
-       call periodicity_chk(co(1,i,1),co(1,i,2),co(1,i,3), &
-            Np,kk(i),dlx,dly,dlz, periodic_x, periodic_y, periodic_z, seed)
+       call periodicity_chk(co(:,i,1),co(:,i,2),co(:,i,3), &
+            Np,kk(i), dlx, dly, dlz, periodic_x, periodic_y, periodic_z, seed)
 
        ! add second dodecaeder mirrored at (x)-axis
        do j=Np+1,2*Np
@@ -220,7 +220,7 @@ contains
   !! kp is the array of wavenumbers in the periodic direction. kp is filled
   !! with wavenumbers that are multiple of 2pi/Lp, so kp = n*2pi/Lp
   subroutine make_periodic_1D(k1, k2, kp, np, K_total, Lp, seed)
-    real(kind=rp), intent(inout) :: k1(1), k2(1), kp(1)
+    real(kind=rp), intent(inout) :: k1(:), k2(:), kp(:)
     integer, intent(in) :: np
     real(kind=rp), intent(in) :: K_total
     real(kind=rp), intent(in) :: Lp
@@ -312,7 +312,7 @@ contains
   !! kp1 and kp2 periodic, based on the lengths Lp1 and Lp2.
   !! See make_periodic_1D for more details.
   subroutine make_periodic_2D(k1, kp1, kp2, np, K_total, L1, L2)
-    real(kind=rp), intent(inout) :: k1(1), kp1(1), kp2(1)
+    real(kind=rp), intent(inout) :: k1(:), kp1(:), kp2(:)
     integer, intent(in) :: np
     real(kind=rp), intent(in) :: K_total
     real(kind=rp), intent(in) :: L1, L2
@@ -430,7 +430,7 @@ contains
 
   subroutine periodicity_chk(kx, ky, kz, np, kk, dlx, dly, dlz, ifxp, ifyp, &
        ifzp, seed)
-    real(kind=rp), intent(inout) :: kx(1),ky(1),kz(1)
+    real(kind=rp), intent(inout) :: kx(:), ky(:), kz(:)
     integer, intent(in) :: np
     real(kind=rp), intent(in) :: kk
     real(kind=rp), intent(in) :: dlx,dly,dlz
@@ -681,9 +681,9 @@ contains
   !----------------------------------------------------------------------
 
   !> NOTE: This modifies the value of Np!
-  subroutine gen_dodeca_k(kx,ky,kz,K_tot,Np,seed)
+  subroutine gen_dodeca_k(kx, ky, kz, K_tot, Np, seed)
 
-    real(kind=rp), intent(inout) :: kx(1),ky(1),kz(1)
+    real(kind=rp), intent(inout) :: kx(:),ky(:),kz(:)
     real(kind=rp), intent(in) :: K_tot
     integer, intent(inout) :: Np
     integer, intent(in) :: seed
