@@ -207,7 +207,7 @@ contains
     this%y_delta_rise = y_delta_rise!0.002
     this%y_delta_fall = y_delta_fall!0.002
     this%t_start = t_start
-    this%t_end = t_start + t_ramp
+    this%t_end = t_ramp
 
   end subroutine FST_init_common
 
