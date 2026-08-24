@@ -42,8 +42,7 @@ contains
     real(kind=rp) :: ue,ve,we
     real(kind=rp) :: uamp,vamp,wamp, u_dot_k, norm_ki
     real(kind=rp) :: amp, dlx, dly, dlz
-    real(kind=rp) :: bb(2*Npmax*Nshells, 3), bb1(2*Npmax*Nshells, 3), &
-      u_hat(3), u_hat_p(3)
+    real(kind=rp) :: u_hat(3), u_hat_p(3)
     character(len=LOG_SIZE) :: log_buf
 
     if (present(Lx)) then
@@ -86,10 +85,15 @@ contains
        ! Generate wavenumbers distributed on spheres
        ! note that Npmax may get modified
        ! 
+       ! NOTE: k_x,k_y,k_z and shell are allocated only on rank 0. This is 
+       ! because the size Npeff if computed inside spec_s, which also populates
+       ! these arrays! That is why after the end if we allocate the arrays on
+       ! all other ranks.
        call spec_s(Npeff, IL, Tu, U_inf, Npmax, Nshells, k_start, k_end, &
          k_x, k_y, k_z, shell, shell_amp, dlx, dly, dlz, periodic_x, periodic_y, &
          periodic_z, seed, write_file_path, write_files) ! get isotropically distributed wavenumbers in spheres
 
+       ! This will be the total size of our arrays
        n_modes = 2*Npeff*Nshells
 
     end if
@@ -107,22 +111,30 @@ contains
     !
     if (pe_rank .eq. 0) then
 
-       do k=1,coef%msh%gdim
+      block
 
-         ! this loop should be done with Npeff instead BUT we keep it this way
-         ! so the ran2 function is called the exact same number of times as the
-         ! original code
-          do i=1,2*Npmax*Nshells 
+         ! Temporary arrays for random generation
+         real(kind=rp) :: bb(2*Npmax*Nshells, 3), bb1(2*Npmax*Nshells, 3)
 
-             bb(i,k) = ran2(seed)*2.0*pi ! random phase shift
-             phase_shifts(i) = bb(i,1)
+         do k=1,coef%msh%gdim
 
-             bb1(i,k) = 2.0*ran2(seed)-1.0 ! random amplitude
+            ! this loop should be done with Npeff instead BUT we keep it this way
+            ! so the ran2 function is called the exact same number of times as the
+            ! original code
+            do i=1,2*Npmax*Nshells 
 
-             if (write_files) write(137,*) bb(i,1), bb1(i,1)
-          enddo
-          
-       enddo
+               bb(i,k) = ran2(seed)*2.0*pi ! random phase shift
+
+               ! Load phase_shifts, but careful with the bounds
+               ! if Npmax < Np, we risk overflow
+               if (i .le. n_modes) phase_shifts(i) = bb(i,1)
+
+               bb1(i,k) = 2.0*ran2(seed)-1.0 ! random amplitude
+
+               if (write_files) write(137,*) bb(i,1), bb1(i,1)
+            enddo
+            
+         enddo
 
        if (write_files) close(137)
 
@@ -199,12 +211,22 @@ contains
        write(log_buf,'(A24,9x,E12.5E2)') 'Estimated Tu*U_inf', &
             sqrt((ue+ve+we)/3.)
        call neko_log%message(log_buf)
-
+      end block
     end if ! end if pe_rank .eq. 0
 
     !
     ! Broadcast variables so all ranks know what has been generated
     !
+
+    ! Allocate the missing arrays on all ranks != 0 since the allocation
+    ! was done on rank 0 in spec_s
+    if (pe_rank .ne. 0) then
+      allocate(k_x(n_modes))
+      allocate(k_y(n_modes))
+      allocate(k_z(n_modes))
+      allocate(shell(n_modes))
+    end if
+
     call MPI_Bcast(k_x, n_modes, &
          MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
     call MPI_Bcast(k_y, n_modes, &
