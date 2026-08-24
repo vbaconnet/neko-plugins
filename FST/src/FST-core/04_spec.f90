@@ -38,8 +38,6 @@ contains
 
     character(len=LOG_SIZE) :: log_buf
     integer :: shell_modes(nshells) ! Modes saved per shell
-    real(kind=rp) :: k_num(2*Npmax*Nshells, 3)
-    real(kind=rp) :: k_num_all(2*Npmax*Nshells, 3)
 
     ! integer :: Nsmax
     ! Nsmax = nshells
@@ -57,45 +55,42 @@ contains
     integer z1,z2
     !integer :: seed
 
-    real(kind=rp) :: dmin, dkint
+    real(kind=rp) :: dk, dkint
 
     real(kind=rp) :: co(2*Npmax,nshells,3)
     real(kind=rp) :: kk(0:nshells)
-    real(kind=rp) :: tke_tot !
-    real(kind=rp) :: tke_tot1 !
+    real(kind=rp) :: q_truncated, q_continuous
+    real(kind=rp) :: q(Nshells) ! tke in each shell
 
-    real(kind=rp) :: tke_scaled
-
-    !----------------------------------------
-
-
-    call print_param('integral length scale', IL)
+    real(kind=rp) :: q_theoretical ! Theoretical TKE
+    
     Np = Npmax
+    dk = (k_end - k_start)/real(nshells-1, kind=rp)
+    q_theoretical = (3.0_rp/2.0_rp*(Tu*U_inf)**2.0_rp) ! = 3/2 * Tu**2 * Uinf**2
 
-    tke_scaled = (3.0/2.*(Tu*U_inf)**2) ! = 3/2 * Tu**2 * Uinf**2
-
-    !  ------ integrate the energy spectrum (mimics continuous integral) ---
-    Ndk = 5000 ! just a large no of points on the spectrum
-    dkint = (k_end-k_start)/float(Ndk)
-
-    tke_tot1 = (ek(k_start,IL,1._rp) + ek(k_end,IL,1._rp))
-    do i=1,Ndk-1
-       tke_tot1 = tke_tot1 + ek(k_start + i*dkint, IL, 1._rp)
-    end do
-    tke_tot1 = tke_tot1*dkint
-    call print_param('FST - integrated energy in spectrum ',tke_tot1)
-    ! ------------------------------------------------------------------------
-
-    ! ----- integrate the energy spectrum with nshells points ----------------
-    dkint = (k_end - k_start)/real(nshells-1)
-    tke_tot = 0.
+    !
+    ! Generate wavenumbers, this will also give us a definitive value for
+    ! Np
+    !
+    kk(0) = 0.0_rp
     do i=1,nshells
-       tke_tot = tke_tot + ek(k_start + (i-1)*dkint,IL,1._rp)
+       ! Fill the total wavenumber vector
+       kk(i) = k_start + (i-1)*dk ! kk = k_start, k_start+dk, k_start+2dk + ... + k_end
+
+       ! Fill            co(1:Np,i,1), co(1:Np,i,2), co(1:Np,i,3)
+       call gen_dodeca_k(co(1,i,1), co(1,i,2), co(1,i,3), &
+            kk(i),Np,seed)
+       Npeff = Np
+       print *, Np, Npeff, Npmax
     end do
-    tke_tot = tke_tot*dkint
-    write (log_buf, *) 'FST - discretized on ', nshells, ' shells :' , tke_tot
-    call neko_log%message(log_buf)
-    ! -------------------------------------------------------------------------
+    
+    !
+    ! Allocate the arrays here because they will be filled below
+    !
+    allocate(k_x(Np*2*nshells))
+    allocate(k_y(Np*2*nshells))
+    allocate(k_z(Np*2*nshells))
+    allocate(shell(Np*2*nshells))
 
     !     Write wavenumbers to ffst_ile
     if (write_files) then
@@ -109,32 +104,6 @@ contains
        write(10,*) 'isotropic coordinates'
        write(10,'(2a5,3a18)') 'i','j','x','y','z'
     endif
-
-    kk(0) = 0.0_rp
-
-    call print_param("Truncated TKE",tke_scaled/tke_tot)
-
-    !
-    ! Generate the wavenumbers, this will also give us a definitive value for
-    ! Np
-    !
-    do i=1,nshells
-
-       kk(i) = k_start + (i-1)*(k_end - k_start)/real(nshells-1, kind=rp) ! kk = k_start, k_start+dk, k_start+2dk + ... + k_end
-
-       ! Fill            co(1:Np,i,1), co(1:Np,i,2), co(1:Np,i,3)
-       call gen_dodeca_k(co(1,i,1), co(1,i,2), co(1,i,3), &
-            kk(i),Np,seed)
-       Npeff = Np
-    end do
-    
-    !
-    ! Allocate the arrays here because they will be filled below
-    !
-    allocate(k_x(Np*2*nshells))
-    allocate(k_y(Np*2*nshells))
-    allocate(k_z(Np*2*nshells))
-    allocate(shell(Np*2*nshells))
 
     !
     ! Recompute wavenumbers in the periodic directions
@@ -158,11 +127,12 @@ contains
     end do
 
     if (write_files) close(10) ! sphere.dat
-
+    
     !
     ! Remove mode (0,0,0) if it exists, and assign the result to our
     ! arrays kx, ky, kz
     !
+    shell_modes = 0
     z1=0
     z2=0
     l=0
@@ -175,31 +145,70 @@ contains
              continue
           else
              z1=z1+1
-
+             
+             shell_modes(i)=shell_modes(i)+1
+             
              l=l+1
-             do k=1,3
-                k_num(l,k) = co(j,i,k)
-                k_num_all(l,k) = co(j,i,k)
-             end do
-             do k = 1,3
-                k_x(l) = co(j,i,1)
-                k_y(l) = co(j,i,2)
-                k_z(l) = co(j,i,3)
-                if (k_x(l) .ne. k_num_all(l,1)) call neko_error("bwa")
-                if (k_y(l) .ne. k_num_all(l,2)) call neko_error("bwa")
-                if (k_z(l) .ne. k_num_all(l,3)) call neko_error("bwa")
-             enddo
+
+             k_x(l) = co(j,i,1)
+             k_y(l) = co(j,i,2)
+             k_z(l) = co(j,i,3)
 
              shell(l) = i
 
           endif ! if (.not.(0,0,0))
        end do ! j=1,2*Np
     end do ! i=1,nshells
-    ! write(6,*) 'FST - (0,0,0) wavenumber removed'
+
     call neko_log%message('FST - (0,0,0) wavenumber removed')
 
     write(log_buf, *) 'FST - Saved ',z1,' of ',z1+z2, ' fst modes.'
     call neko_log%message(log_buf)
+
+    !
+    ! Generate amplitudes
+    !
+
+    !  ------ integrate the energy spectrum (mimics continuous integral) ---
+    Ndk = 5000 ! just a large no of points on the spectrum
+    dkint = (k_end-k_start)/float(Ndk)
+
+    ! Include the bounds first
+    q_continuous = ek(k_start, IL, 1.0_rp) + ek(k_end, IL, 1.0_rp)
+
+    do i=1,Ndk-1
+       q_continuous = q_continuous + ek(k_start + i*dkint, IL, 1._rp)
+    end do
+    q_continuous = q_continuous*dkint
+    write (log_buf, '(A,F10.6)') 'Truncated, continuous integral of spectrum ', q_continuous
+    call neko_log%message(log_buf)
+    ! ------------------------------------------------------------------------
+
+    ! ----- integrate the energy spectrum with nshells points ----------------
+    ! This is the "discretized" energy.
+    q_truncated = 0.0_rp
+    do i=1,nshells
+       q_truncated = q_truncated + ek(k_start + (i-1)*dk, IL, 1._rp)
+    end do
+    q_truncated = q_truncated*dk
+    write (log_buf, '(A,I3.3,A,F10.6)') 'Truncated, discrete integral on ', nshells, ' shells :' , q_truncated
+    call neko_log%message(log_buf)
+    ! -------------------------------------------------------------------------
+    
+    call print_param("q0: ", q_theoretical/q_truncated)
+    
+    !
+    ! Generate amplitudes
+    !
+    do i = 1, Nshells
+
+       ! Generate local TKE
+       q(i) = ek(kk(i), IL, q_theoretical/q_truncated)
+
+       shell_amp(i) = sqrt(2.0_rp * q(i)*dk * 2.0_rp / &
+            (real(shell_modes(i), kind=rp)))
+       
+    end do
 
     return
   end subroutine spec_s

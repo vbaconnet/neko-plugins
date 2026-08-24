@@ -29,7 +29,7 @@ contains
     real(kind=rp), allocatable, intent(inout) :: k_x(:), k_y(:), k_z(:)
     integer, intent(inout) :: n_modes ! n_modes = k_length
     integer, allocatable, intent(inout) :: shell(:)
-    real(kind=rp), allocatable, intent(inout) :: shell_amp(:)
+    real(kind=rp), intent(inout) :: shell_amp(Nshells)
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
     integer, intent(inout) :: seed
     character(len=*), intent(in) :: write_file_path
@@ -86,7 +86,6 @@ contains
        ! Generate wavenumbers distributed on spheres
        ! note that Npmax may get modified
        ! 
-       print *, "> kstart", k_start, k_end
        call spec_s(Npeff, IL, Tu, U_inf, Npmax, Nshells, k_start, k_end, &
          k_x, k_y, k_z, shell, shell_amp, dlx, dly, dlz, periodic_x, periodic_y, &
          periodic_z, seed, write_file_path, write_files) ! get isotropically distributed wavenumbers in spheres
@@ -101,7 +100,6 @@ contains
     call MPI_Bcast(n_modes, 1, MPI_INTEGER, 0, NEKO_COMM, ierr)
 
     allocate(phase_shifts(n_modes))
-    allocate(shell_amp(n_modes))
     allocate(random_vectors(n_modes,3))
 
     !
@@ -123,11 +121,10 @@ contains
 
              if (write_files) write(137,*) bb(i,1), bb1(i,1)
           enddo
+          
        enddo
 
        if (write_files) close(137)
-       ! write(6,*) 'FST - Random amplitude generated'
-       call neko_log%message("FST - Random amplitude generated")
 
        !
        ! Enforce continuity on the random unit vectors
@@ -190,16 +187,16 @@ contains
 
        if (write_files) close(13)
 
-       write(log_buf,'(A18,10x,E12.5E2)') 'FST - Energy in u',ue
+       write(log_buf,'(A18,10x,E12.5E2)') 'Energy in u',ue
        call neko_log%message(log_buf)
-       write(log_buf,'(A18,10x,E12.5E2)') 'FST - Energy in v',ve
+       write(log_buf,'(A18,10x,E12.5E2)') 'Energy in v',ve
        call neko_log%message(log_buf)
-       write(log_buf,'(A18,10x,E12.5E2)') 'FST - Energy in w',we
+       write(log_buf,'(A18,10x,E12.5E2)') 'Energy in w',we
        call neko_log%message(log_buf)
-       write(log_buf,'(A20,8x,E12.5E2)') 'FST - Estimated tke', &
+       write(log_buf,'(A20,8x,E12.5E2)') 'Estimated tke', &
             (ue+ve+we)/2.
        call neko_log%message(log_buf)
-       write(log_buf,'(A24,9x,E12.5E2)') 'FST - Estimated Tu*U_inf', &
+       write(log_buf,'(A24,9x,E12.5E2)') 'Estimated Tu*U_inf', &
             sqrt((ue+ve+we)/3.)
        call neko_log%message(log_buf)
 
@@ -223,6 +220,7 @@ contains
 
     call MPI_Bcast(shell, n_modes, &
          MPI_INTEGER , 0, NEKO_COMM, ierr)
+
     call MPI_Bcast(shell_amp, Nshells , &
          MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
 

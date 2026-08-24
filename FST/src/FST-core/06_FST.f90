@@ -170,6 +170,9 @@ contains
     integer, intent(inout), optional :: seed
 
     integer :: seed_ = -143
+
+    call this%free()
+
     if (present(seed)) seed_ = seed
     this%seed = seed_
 
@@ -180,6 +183,8 @@ contains
     this%k_end = k_end
 
     this%n_shells = Nshells
+    allocate(this%shell_amp(Nshells))
+
     this%n_max_pts_per_shell = Npmax
 
     this%periodic_x = periodic_x
@@ -362,9 +367,9 @@ contains
     type(c_ptr) :: mask_d
     integer :: i, idx
 
-    if (allocated(this%u_baseflow)) deallocate(this%u_baseflow)
-    if (allocated(this%v_baseflow)) deallocate(this%v_baseflow)
-    if (allocated(this%w_baseflow)) deallocate(this%w_baseflow)
+    if (allocated(this%u_baseflow)) call neko_error("Baseflow already allocated!")
+    if (allocated(this%v_baseflow)) call neko_error("Baseflow already allocated!")
+    if (allocated(this%w_baseflow)) call neko_error("Baseflow already allocated!")
 
     allocate(this%u_baseflow(n))
     allocate(this%v_baseflow(n))
