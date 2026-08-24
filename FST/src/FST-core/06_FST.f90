@@ -271,6 +271,7 @@ contains
     call print_param("y_delta_rise", this%y_delta_rise)
     call print_param("y_delta_fall", this%y_delta_fall)
     call print_param("t_start", this%t_start)
+    call print_param("t_ramp", this%t_end)
     call print_param("seed", real(this%seed, kind=rp))
 
   end subroutine FST_print_params
