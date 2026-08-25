@@ -211,6 +211,9 @@ contains
     this%y_delta_fall = y_delta_fall!0.002
     this%t_start = t_start
     this%t_end = t_ramp
+    if (t_start .lt. 0.0_rp .or. t_ramp .lt. 0.0_rp .or. t_ramp .lt. t_start) then
+      call neko_error("t_start or t_ramp is invalid!")
+    end if
 
   end subroutine FST_init_common
 
@@ -257,7 +260,6 @@ contains
        periodic_x, periodic_y, periodic_z, &
        xmin, xmax, xstart, xend, x_delta_rise, x_delta_fall, &
        ymin, ymax, ystart, yend, y_delta_rise, y_delta_fall, &
-       fringe_max, &
        t_start, t_end, &
        seed)
 
@@ -268,7 +270,6 @@ contains
     real(kind=rp), intent(in) :: ymin, ymax, ystart, yend
     real(kind=rp), intent(in) :: x_delta_rise, x_delta_fall
     real(kind=rp), intent(in) :: y_delta_rise, y_delta_fall
-    real(kind=rp), intent(in) :: fringe_max
     real(kind=rp), intent(in) :: t_start
     real(kind=rp), intent(in) :: t_end
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
@@ -280,7 +281,7 @@ contains
        periodic_x, periodic_y, periodic_z, &
        xmin, xmax, xstart, xend, x_delta_rise, x_delta_fall, &
        ymin, ymax, ystart, yend, y_delta_rise, y_delta_fall, &
-       fringe_max, &
+       1.0_rp, &
        t_start, t_end, &
        seed)
 
@@ -347,21 +348,37 @@ contains
     call neko_log%end_section()
 
     call neko_log%section("--- Fringe ---")
-    call print_param("xmin               ", this%xmin)
-    call print_param("xmax               ", this%xmax)
-    call print_param("xstart             ", this%xstart)
-    call print_param("xend               ", this%xend)
-    call print_param("ymin               ", this%ymin)
-    call print_param("ymax               ", this%ymax)
-    call print_param("ystart             ", this%ystart)
-    call print_param("yend               ", this%yend)
-    call print_param("fringe_max         ", this%fringe_max, fmt='F3.1')
-    call print_param("x_delta_rise       ", this%x_delta_rise)
-    call print_param("x_delta_fall       ", this%x_delta_fall)
-    call print_param("y_delta_rise       ", this%y_delta_rise)
-    call print_param("y_delta_fall       ", this%y_delta_fall)
-    call print_param("t_start            ", this%t_start)
-    call print_param("t_end              ", this%t_end)
+    call neko_log%section("Space")
+    if (.not. this%periodic_z) then
+      call print_param("xmin           ", this%xmin)
+      call print_param("xmax           ", this%xmax)
+      call print_param("xstart         ", this%xstart)
+      call print_param("xend           ", this%xend)
+      call print_param("x_delta_rise   ", this%x_delta_rise)
+      call print_param("x_delta_fall   ", this%x_delta_fall)
+    else
+      call neko_log%message("(periodic in y, no fringe required)")
+    end if
+
+    if (.not. this%periodic_y) then
+      call print_param("ymin           ", this%ymin)
+      call print_param("ymax           ", this%ymax)
+      call print_param("ystart         ", this%ystart)
+      call print_param("yend           ", this%yend)
+      call print_param("y_delta_rise   ", this%y_delta_rise)
+      call print_param("y_delta_fall   ", this%y_delta_fall)
+    else
+      call neko_log%message("(periodic in z, no fringe required)")
+    end if
+   
+    call print_param("Fringe amplitude ", this%fringe_max, fmt='F3.1')
+    call neko_log%end_section()
+
+    call neko_log%section("Time")
+    call print_param("t_start          ", this%t_start)
+    call print_param("t_end            ", this%t_end)
+    call neko_log%end_section()
+
     call neko_log%end_section()
 
   end subroutine FST_print_params
@@ -460,10 +477,6 @@ contains
       this%shell_amp, this%periodic_x, this%periodic_y, this%periodic_z, &
       this%seed, path, .true., gdim, Lx, Ly, Lz)
 
-    this%Lx = Lx
-    this%Ly = Ly
-    this%Lz = Lz
-
     call this%validate()
 
     call neko_log%end_section('')
@@ -556,49 +569,65 @@ contains
     character(len=*), intent(in) :: path
     integer, intent(in) :: gdim
 
-    real(kind=rp) :: x, y, z, xmin, xmax, ymin, ymax, zmin, zmax, Lx, Ly, Lz
+    real(kind=rp) :: x, y, z, ymin, ymax, zmin, zmax, Ly, Lz
     integer :: ierr, i, idx, m, j
 
     !
-    ! Compute the domain lengths of the bc
+    ! Compute the spatial bounds in the mask
     !
-    xmax = -huge(1.0_rp)
-    xmin =  huge(1.0_rp)
-    ymax = -huge(1.0_rp)
-    ymin =  huge(1.0_rp)
-    zmax = -huge(1.0_rp)
-    zmin =  huge(1.0_rp)
+    ymin = huge(1.0_rp); zmin = huge(1.0_rp)
+    ymax = -huge(1.0_rp); zmax = -huge(1.0_rp)
     do idx = 1, n
       i = bc_mask(idx)
-      xmin = min(xmin, x_dof(i,1,1,1))
-      xmax = max(xmax, x_dof(i,1,1,1))
       ymin = min(ymin, y_dof(i,1,1,1))
-      ymax = max(ymax, y_dof(i,1,1,1))
       zmin = min(zmin, z_dof(i,1,1,1))
+      ymax = max(ymax, y_dof(i,1,1,1))
       zmax = max(zmax, z_dof(i,1,1,1))
     end do
 
-    call MPI_Allreduce(MPI_IN_PLACE, xmin, 1, &
-      MPI_REAL_PRECISION, MPI_MIN, NEKO_COMM, ierr)
-    call MPI_Allreduce(MPI_IN_PLACE, xmax, 1, &
-      MPI_REAL_PRECISION, MPI_MAX, NEKO_COMM, ierr)
-    call MPI_Allreduce(MPI_IN_PLACE, ymin, 1, &
-      MPI_REAL_PRECISION, MPI_MIN, NEKO_COMM, ierr)
-    call MPI_Allreduce(MPI_IN_PLACE, ymax, 1, &
-      MPI_REAL_PRECISION, MPI_MAX, NEKO_COMM, ierr)
-    call MPI_Allreduce(MPI_IN_PLACE, zmin, 1, &
-      MPI_REAL_PRECISION, MPI_MIN, NEKO_COMM, ierr)
-    call MPI_Allreduce(MPI_IN_PLACE, zmax, 1, &
-      MPI_REAL_PRECISION, MPI_MAX, NEKO_COMM, ierr)
+    call mpi_allreduce(MPI_IN_PLACE, ymin, 1, &
+         mpi_real_precision, mpi_min, neko_comm, ierr)
+    call mpi_allreduce(MPI_IN_PLACE, zmin, 1, &
+         mpi_real_precision, mpi_min, neko_comm, ierr)
+    call mpi_allreduce(MPI_IN_PLACE, ymax, 1, &
+         mpi_real_precision, mpi_max, neko_comm, ierr)
+    call mpi_allreduce(MPI_IN_PLACE, zmax, 1, &
+         mpi_real_precision, mpi_max, neko_comm, ierr)
 
-    Lx = xmax - xmin
     Ly = ymax - ymin
     Lz = zmax - zmin
 
     !
+    ! Update the fringe parameters with new bounds for periodic directions
+    ! NOTE the notations here are a bit confusing with (x,y) but our directions
+    ! are (y,z). 
+    ! The point of updating the parameters in periodic directions is to
+    ! have a fringe of constant value 1.0 across the entire boundary, therefore
+    ! to stretch the bounds xmin/max etc so the fringe region is far outside the
+    ! domain
+    !
+    if (this%periodic_z) then
+      this%xmin = zmin - 10.0_rp * Lz 
+      this%xmax = zmax + 10.0_rp * Lz
+      this%xstart = this%xmin
+      this%xend = this%xmax
+      this%x_delta_rise = 0.001_rp * Lz
+      this%x_delta_fall = 0.001_rp * Lz
+    end if
+
+    if (this%periodic_y) then
+      this%ymin = ymin - 10.0_rp * Ly 
+      this%ymax = ymax + 10.0_rp * Ly
+      this%ystart = this%ymin
+      this%yend = this%ymax
+      this%y_delta_rise = 0.1_rp * Ly
+      this%y_delta_fall = 0.1_rp * Ly
+    end if
+
+    !
     ! Do the common generation (not passing Lx since it is not supported yet)
     !
-    call this%generate_common(path, gdim, Lx=Lx, Ly=Ly, Lz=Lz)
+    call this%generate_common(path, gdim, Ly = Ly, Lz = Lz)
 
     !
     ! Apply baseflow in the bc zone
@@ -612,7 +641,6 @@ contains
     do idx = 1, size(this%fringe_space)
 
        i = bc_mask(idx)
-       x = x_dof(i,1,1,1)
        y = y_dof(i,1,1,1)
        z = z_dof(i,1,1,1)
 
@@ -849,7 +877,7 @@ contains
   ! Fringe function as described in Schlatter (2001), extended to take y bounds into account too
   !
   !   Here is what the fringe looks like, except the ramp-up is not linear
-  !   but erponential (see function S below)
+  !   but exponential (see function S below)
   !
   ! fringe_max      ________
   !                /        \
