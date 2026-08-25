@@ -578,7 +578,7 @@ contains
     end do
 
     !
-    ! Precompute time-independent term
+    ! Precompute spatial, time-independent term
     !
     allocate(this%phi_0(this%n_modes, n))
 
@@ -699,16 +699,9 @@ contains
     real(kind=rp), intent(in) :: angleXY
     logical, intent(in) :: on_host
 
-!!$    integer :: idx, l, m, i, shellno
-!!$    integer, parameter :: gdim = 3
-!!$    real(kind=rp) :: phase_shft, phi, amp, pert, urand, vrand, wrand
-!!$    real(kind=rp) :: rand_vec(gdim), vel_mag, phi_t
-
-    real(kind=rp) :: fringe_time, cosa, sina
+    real(kind=rp) :: fringe_time
 
     fringe_time = time_ramp(t, this%t_end, this%t_start)
-    cosa = cos(angleXY)
-    sina = sin(angleXY)
 
     call fst_bc_compute(t, this%Uinf, u_bc, v_bc, w_bc, bc_mask, n, &
          this%u_baseflow, this%v_baseflow, this%w_baseflow, &

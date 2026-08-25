@@ -55,7 +55,7 @@ contains
     real(kind=rp), intent(in) :: value
     character(len=LOG_SIZE) :: log_buf
 
-    write(log_buf, *) "[FST] ", name, ": ", value
+    write(log_buf, '(A,A,g0)') name, ": ", value
     call neko_log%message(log_buf)
 
   end subroutine print_param
