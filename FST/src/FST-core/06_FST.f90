@@ -36,8 +36,11 @@ module FST
 
      ! periodic directions
      logical :: periodic_x
+     real(kind=rp) :: Lx
      logical :: periodic_y
+     real(kind=rp) :: Ly
      logical :: periodic_z
+     real(kind=rp) :: Lz
 
      ! x fringe
      real(kind=rp) :: xmin
@@ -457,7 +460,13 @@ contains
       this%shell_amp, this%periodic_x, this%periodic_y, this%periodic_z, &
       this%seed, path, .true., gdim, Lx, Ly, Lz)
 
-    call neko_log%end_section('Done generating FST')
+    this%Lx = Lx
+    this%Ly = Ly
+    this%Lz = Lz
+
+    call this%validate()
+
+    call neko_log%end_section('')
 
   end subroutine FST_generate_common
 
@@ -474,22 +483,22 @@ contains
    call neko_log%section("Generated wavenumbers")
 
    ! x-direction
-   kmin = glmin(this%k_x, this%n_modes)
-   kmax = glmax(this%k_x, this%n_modes)
-   call print_param("(x) Smallest wavelength", 2.0_rp*pi/kmax)
-   call print_param("(x)  Largest wavelength", 2.0_rp*pi/kmin)
+   kmin = glmin(abs(this%k_x), this%n_modes)
+   kmax = glmax(abs(this%k_x), this%n_modes)
+   call print_param("(x) min wavelength", 2.0_rp*pi/kmax, fmt='F10.4')
+   call print_param("(x) max wavelength", 2.0_rp*pi/kmin, fmt='F10.4')
 
    ! y-direction
-   kmin = glmin(this%k_y, this%n_modes)
-   kmax = glmax(this%k_y, this%n_modes)
-   call print_param("(y) Smallest wavelength", 2.0_rp*pi/kmax)
-   call print_param("(y)  Largest wavelength", 2.0_rp*pi/kmin)
+   kmin = glmin(abs(this%k_y), this%n_modes)
+   kmax = glmax(abs(this%k_y), this%n_modes)
+   call print_param("(y) min wavelength", 2.0_rp*pi/kmax, fmt='F10.4')
+   call print_param("(y) max wavelength", 2.0_rp*pi/kmin, fmt='F10.4')
 
    ! z-direction
-   kmin = glmin(this%k_z, this%n_modes)
-   kmax = glmax(this%k_z, this%n_modes)
-   call print_param("(z) Smallest wavelength", 2.0_rp*pi/kmax)
-   call print_param("(z)  Largest wavelength", 2.0_rp*pi/kmin)
+   kmin = glmin(abs(this%k_z), this%n_modes)
+   kmax = glmax(abs(this%k_z), this%n_modes)
+   call print_param("(z) min wavelength", 2.0_rp*pi/kmax, fmt='F10.4')
+   call print_param("(z) max wavelength", 2.0_rp*pi/kmin, fmt='F10.4')
    call neko_log%end_section()
 
   end subroutine FST_validate
@@ -590,8 +599,6 @@ contains
     ! Do the common generation (not passing Lx since it is not supported yet)
     !
     call this%generate_common(path, gdim, Lx=Lx, Ly=Ly, Lz=Lz)
-
-    call this%validate()
 
     !
     ! Apply baseflow in the bc zone

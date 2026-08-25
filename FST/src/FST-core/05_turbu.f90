@@ -148,7 +148,7 @@ contains
 
        enddo
 
-       call neko_log%message('FST - Amplitudes projection done')
+       call neko_log%message('Amplitudes projection done.')
 
        !           Check energy in individual modes
        ue=0.

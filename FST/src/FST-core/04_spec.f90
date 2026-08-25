@@ -159,9 +159,9 @@ contains
        end do ! j=1,2*Np
     end do ! i=1,nshells
 
-    call neko_log%message('FST - (0,0,0) wavenumber removed')
+    call neko_log%message('(0,0,0) wavenumber removed')
 
-    write(log_buf, *) 'FST - Saved ',z1,' of ',z1+z2, ' fst modes.'
+    write(log_buf, *) 'Saved ',z1,' of ',z1+z2, ' fst modes.'
     call neko_log%message(log_buf)
 
     !
