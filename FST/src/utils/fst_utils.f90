@@ -1,6 +1,12 @@
 module fst_utils
     use num_types, only : rp
     use logger, only : LOG_SIZE, neko_log
+
+
+    interface print_param
+      module procedure print_param_int, print_param_rp, print_param_bool
+    end interface print_param
+
 contains
 
     !> A simple portable random number generator
@@ -48,16 +54,51 @@ contains
   end function ran2
 
   ! Use to print one parameter
-  subroutine print_param(name, value)
+  subroutine print_param_rp(name, value, fmt)
     implicit none
 
     character(len=*), intent(in) :: name
     real(kind=rp), intent(in) :: value
-    character(len=LOG_SIZE) :: log_buf
+    character(len=*), intent(in), optional :: fmt
 
-    write(log_buf, '(A,A,g0)') name, ": ", value
+    character(len=LOG_SIZE) :: log_buf
+    character(len=128) :: fmt_
+
+    fmt_ = 'g0'
+    if (present(fmt)) fmt_ = trim(fmt)
+
+    write(log_buf, '(A,A,' // trim(fmt_) // ')') name, ": ", value
     call neko_log%message(log_buf)
 
-  end subroutine print_param
+  end subroutine print_param_rp
 
+  ! Use to print one parameter
+  subroutine print_param_int(name, value)
+    implicit none
+
+    character(len=*), intent(in) :: name
+    integer, intent(in) :: value
+    character(len=LOG_SIZE) :: log_buf
+
+    write(log_buf, '(A,A,I5)') name, ": ", value
+    call neko_log%message(log_buf)
+
+  end subroutine print_param_int
+
+    ! Use to print one parameter
+  subroutine print_param_bool(name, value)
+    implicit none
+
+    character(len=*), intent(in) :: name
+    logical, intent(in) :: value
+    character(len=LOG_SIZE) :: log_buf
+    character(len=3) :: yes_or_no
+
+    yes_or_no = "no"
+    if (value) yes_or_no = "yes"
+
+    write(log_buf, '(A,A,A)') name, ": ", trim(yes_or_no)
+    call neko_log%message(log_buf)
+
+  end subroutine print_param_bool
 end module fst_utils

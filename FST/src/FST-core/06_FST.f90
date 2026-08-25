@@ -18,7 +18,7 @@ module FST
   use utils, only: neko_error
   use point_zone, only: point_zone_t
   use comm, only: pe_rank
-  use math, only: masked_gather_copy_0
+  use math, only: masked_gather_copy_0, pi, glmin, glmax
   use device_math, only: device_masked_gather_copy_0
   use device, only: device_map, device_memcpy, HOST_TO_DEVICE, device_unmap
   use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN, MPI_INTEGER, MPI_Bcast, &
@@ -128,7 +128,6 @@ module FST
      !procedure, pass(this) :: init_forcing => FST_init_forcing
      procedure, pass(this) :: unmap => FST_unmap
      procedure, pass(this) :: free => FST_free
-   !   procedure, pass(this) :: validate => FST_validate
      ! =========================================================================
      procedure, pass(this) :: apply_baseflow => FST_apply_baseflow
      procedure, pass(this) :: apply_baseflow_0 => FST_apply_baseflow_0
@@ -139,9 +138,10 @@ module FST
      procedure, pass(this) :: generate_bc => FST_generate_bc
      ! =========================================================================
      ! ======= Apply FST forcing/BC
-   !   procedure, pass(this) :: apply_forcing => FST_forcing_zone
+     !   procedure, pass(this) :: apply_forcing => FST_forcing_zone
      procedure, pass(this) :: apply_BC => FST_apply_BC
      ! ========================================================================
+     procedure, pass(this) :: validate => FST_validate
      procedure, pass(this) :: print => FST_print_params
   end type FST_t
 
@@ -282,7 +282,8 @@ contains
        seed)
 
     call this%print() ! show parameters
-    call neko_log%end_section('Done --> Intializing FST')
+
+    call neko_log%end_section()
 
     this%is_forcing = .false.
     this%is_bc = .true.
@@ -328,31 +329,37 @@ contains
   subroutine FST_print_params(this)
     class(FST_t) :: this
 
-    call neko_log%message("--- FST Generation ---")
-    call print_param("# of shells", real(this%n_shells, kind=rp))
-    call print_param("max # points per shell", real(this%n_max_pts_per_shell, kind=rp))
-    call print_param("Turb. intensity", this%Tu)
-    call print_param("Turb. length scale", this%L)
-    call print_param("k_start", this%k_start)
-    call print_param("k_end", this%k_end)
-    call print_param("seed", real(this%seed, kind=rp))
-    
-    call neko_log%message("--- Fringe ---")
-    call print_param("xmin", this%xmin)
-    call print_param("xmax", this%xmax)
-    call print_param("xstart", this%xstart)
-    call print_param("xend", this%xend)
-    call print_param("ymin", this%ymin)
-    call print_param("ymax", this%ymax)
-    call print_param("ystart", this%ystart)
-    call print_param("yend", this%yend)
-    call print_param("fringe_max", this%fringe_max)
-    call print_param("x_delta_rise", this%x_delta_rise)
-    call print_param("x_delta_fall", this%x_delta_fall)
-    call print_param("y_delta_rise", this%y_delta_rise)
-    call print_param("y_delta_fall", this%y_delta_fall)
-    call print_param("t_start", this%t_start)
-    call print_param("t_end", this%t_end)
+    call neko_log%section("--- FST Generation ---")
+    call print_param("Free-stream vel.   ", this%Uinf, fmt='F6.2')
+    call print_param("Turb. intensity (%)", this%Tu * 100_rp, fmt='F6.2')
+    call print_param("Turb. length scale ", this%L, fmt='F10.6')
+    call print_param("k_start            ", this%k_start)
+    call print_param("k_end              ", this%k_end)
+    call print_param("# of shells        ", this%n_shells)
+    call print_param("max # pts per shell", this%n_max_pts_per_shell)
+    call print_param("Periodic in x      ", this%periodic_x)
+    call print_param("Periodic in y      ", this%periodic_y)
+    call print_param("Periodic in z      ", this%periodic_z)
+    call print_param("seed               ", this%seed)
+    call neko_log%end_section()
+
+    call neko_log%section("--- Fringe ---")
+    call print_param("xmin               ", this%xmin)
+    call print_param("xmax               ", this%xmax)
+    call print_param("xstart             ", this%xstart)
+    call print_param("xend               ", this%xend)
+    call print_param("ymin               ", this%ymin)
+    call print_param("ymax               ", this%ymax)
+    call print_param("ystart             ", this%ystart)
+    call print_param("yend               ", this%yend)
+    call print_param("fringe_max         ", this%fringe_max, fmt='F3.1')
+    call print_param("x_delta_rise       ", this%x_delta_rise)
+    call print_param("x_delta_fall       ", this%x_delta_fall)
+    call print_param("y_delta_rise       ", this%y_delta_rise)
+    call print_param("y_delta_fall       ", this%y_delta_fall)
+    call print_param("t_start            ", this%t_start)
+    call print_param("t_end              ", this%t_end)
+    call neko_log%end_section()
 
   end subroutine FST_print_params
 
@@ -454,6 +461,39 @@ contains
 
   end subroutine FST_generate_common
 
+  subroutine FST_validate(this)
+   class(FST_t), intent(in) :: this
+
+   real(kind=rp) :: kmin, kmax
+   character(len=LOG_SIZE) :: log_buf
+   integer :: ierr
+
+   !
+   ! Compute min/max wavenumbers
+   !
+   call neko_log%section("Generated wavenumbers")
+
+   ! x-direction
+   kmin = glmin(this%k_x, this%n_modes)
+   kmax = glmax(this%k_x, this%n_modes)
+   call print_param("(x) Smallest wavelength", 2.0_rp*pi/kmax)
+   call print_param("(x)  Largest wavelength", 2.0_rp*pi/kmin)
+
+   ! y-direction
+   kmin = glmin(this%k_y, this%n_modes)
+   kmax = glmax(this%k_y, this%n_modes)
+   call print_param("(y) Smallest wavelength", 2.0_rp*pi/kmax)
+   call print_param("(y)  Largest wavelength", 2.0_rp*pi/kmin)
+
+   ! z-direction
+   kmin = glmin(this%k_z, this%n_modes)
+   kmax = glmax(this%k_z, this%n_modes)
+   call print_param("(z) Smallest wavelength", 2.0_rp*pi/kmax)
+   call print_param("(z)  Largest wavelength", 2.0_rp*pi/kmin)
+   call neko_log%end_section()
+
+  end subroutine FST_validate
+
   !> Generate FST for forcing
   subroutine FST_generate_forcing(this, coef, zone, u, v, w, path)
     class(FST_t), intent(inout) :: this
@@ -507,7 +547,6 @@ contains
     character(len=*), intent(in) :: path
     integer, intent(in) :: gdim
 
-    character(len=LOG_SIZE) :: log_buf
     real(kind=rp) :: x, y, z, xmin, xmax, ymin, ymax, zmin, zmax, Lx, Ly, Lz
     integer :: ierr, i, idx, m, j
 
@@ -551,6 +590,8 @@ contains
     ! Do the common generation (not passing Lx since it is not supported yet)
     !
     call this%generate_common(path, gdim, Lx=Lx, Ly=Ly, Lz=Lz)
+
+    call this%validate()
 
     !
     ! Apply baseflow in the bc zone
