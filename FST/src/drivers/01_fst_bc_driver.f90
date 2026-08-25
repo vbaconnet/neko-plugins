@@ -80,7 +80,6 @@ contains
     ! Read parameters for the FST fringe in space
     if (.not. py .or. .not. pz) call json_get(params, "case.FST.alpha", alpha)
 
-
     !
     ! Compute bounds of the domain to set the fringes properly
     ! Note that these values will be overridden if any of these directions
@@ -91,11 +90,11 @@ contains
 
     call json_get_or_default(params, "case.FST.ystart", ystart, ymin)
     call json_get_or_default(params, "case.FST.yend", yend, ymax)
-    delta_y = alpha*Ly
+    delta_y = alpha * (ymax - ymin)
 
     call json_get_or_default(params, "case.FST.zstart", zstart, zmin)
     call json_get_or_default(params, "case.FST.zend", zend, zmax)
-    delta_z = alpha * Lz
+    delta_z = alpha * (zmax - zmin)
 
     !
     ! Read all FST parameters
@@ -154,8 +153,7 @@ contains
     !
     if (.not. FST_GENERATED) then
        call FST_obj%generate_bc(coef%dof%x, coef%dof%y, coef%dof%z, &
-         coef%dof%size(), bc%msk, &
-         bc%msk(0), u, v, w, PATH, coef%msh%gdim)
+         bc%msk, bc%msk(0), u, v, w, PATH, coef%msh%gdim)
        FST_GENERATED = .true.
     end if
 
