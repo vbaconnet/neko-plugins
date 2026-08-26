@@ -77,7 +77,7 @@ contains
     do i=1,nshells
        ! Fill the total wavenumber vector
        kk(i) = k_start + (i-1)*dk ! kk = k_start, k_start+dk, k_start+2dk + ... + k_end
-
+       print *, dk, kk(i)
        ! Fill            co(1:Np,i,1), co(1:Np,i,2), co(1:Np,i,3)
        call gen_dodeca_k(co(:,i,1), co(:,i,2), co(:,i,3), &
             kk(i),Np,seed)
@@ -115,8 +115,8 @@ contains
          lvl=NEKO_LOG_INFO)
 
     do i=1,nshells
-       call periodicity_chk(co(:,i,1),co(:,i,2),co(:,i,3), &
-            Np,kk(i), dlx, dly, dlz, periodic_x, periodic_y, periodic_z, seed)
+       !call periodicity_chk(co(:,i,1),co(:,i,2),co(:,i,3), &
+       !     Np,kk(i), dlx, dly, dlz, periodic_x, periodic_y, periodic_z, seed)
 
        ! add second dodecaeder mirrored at (x)-axis
        do j=Np+1,2*Np
@@ -213,7 +213,8 @@ contains
     ! -------------------------------------------------------------------------
     
     call print_param("Ratio q / q_hat", q_theoretical/q_truncated, fmt='F10.6')
-    
+    print *, "================== q0 ", q_theoretical/q_truncated
+
     !
     ! Generate amplitudes
     !
@@ -710,9 +711,10 @@ contains
 
     real(kind=rp) :: rotx,roty,rotz
 
-    rotx = ran2(seed)*2.*pi
-    roty = ran2(seed)*2.*pi
-    rotz = ran2(seed)*2.*pi
+    rotx = ran2(seed)*2.0_rp*pi
+    roty = ran2(seed)*2.0_rp*pi
+    rotz = ran2(seed)*2.0_rp*pi
+    print *, ">>>>>>>>>>>>>>>", rotx, roty, rotz
     call compute_sphere(Np, kx, ky, kz, K_tot, rotx, roty, rotz, .false.)
 
     return
