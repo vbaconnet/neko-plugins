@@ -1,6 +1,6 @@
 module turbu
   use num_types, only: rp
-  use fst_utils, only : ran2, print_param
+  use fst_utils, only : ran2
   use math, only: pi, abscmp
   use utils, only: neko_error
   use logger, only: LOG_SIZE, neko_log
