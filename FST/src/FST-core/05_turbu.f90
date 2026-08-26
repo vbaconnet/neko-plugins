@@ -1,6 +1,6 @@
 module turbu
   use num_types, only: rp
-  use fst_utils, only : ran2
+  use fst_utils, only : ran2, print_param
   use math, only: pi, abscmp
   use utils, only: neko_error
   use logger, only: LOG_SIZE, neko_log
@@ -96,6 +96,9 @@ contains
          ! Temporary arrays for random generation
          real(kind=rp) :: bb(2*Npmax*Nshells, 3), bb1(2*Npmax*Nshells, 3)
 
+         call neko_log%section("Unit vectors & phase shifts")
+         call neko_log%message("Generating random phase shifts in [0;2pi]")
+         call neko_log%message("Generating random vector components in [-1;1]")
          do k=1, gdim
 
             ! this loop should be done with Npeff instead BUT we keep it this way
@@ -123,6 +126,7 @@ contains
        !              _   _
        !              u . k = 0
        !
+       call neko_log%message("Projecting vector components on div.-free space")
        do i = 1, n_modes
 
           ! u_hat stores the random amplitudes between 0 and 1
@@ -148,18 +152,19 @@ contains
 
        enddo
 
-       call neko_log%message('Amplitudes projection done.')
 
-       !           Check energy in individual modes
-       ue=0.
-       ve=0.
-       we=0.
-       !           Also write the modes
+       !
+       ! Write generated modes and amplitudes to file
+       !
        if (write_files) then
+          call neko_log%message("Writing generated vectors in " // &
+                    trim(write_file_path) // '/fst_spectrum.csv')
+
           open(file=trim(write_file_path) // '/fst_spectrum.csv', unit=13)
           write(13,'(9(A, ","),A)') 'ShellNo','kx','ky','kz', &
                'u_amp','v_amp','w_amp','u_hat_pn1','u_hat_pn2', 'u_hat_pn3'
        end if
+
        do i=1, n_modes
           shellno = shell(i)
           amp = shell_amp(shellno)
@@ -172,26 +177,14 @@ contains
             k_y(i), k_z(i), uamp, vamp, wamp, random_vectors(i,1), &
             random_vectors(i,2), random_vectors(i,3)
 
-          ue = ue + ((uamp)**2)/2.
-          ve = ve + ((vamp)**2)/2.
-          we = we + ((wamp)**2)/2.
        enddo
 
        if (write_files) close(13)
 
-       write(log_buf,'(A18,10x,E12.5E2)') 'Energy in u',ue
-       call neko_log%message(log_buf)
-       write(log_buf,'(A18,10x,E12.5E2)') 'Energy in v',ve
-       call neko_log%message(log_buf)
-       write(log_buf,'(A18,10x,E12.5E2)') 'Energy in w',we
-       call neko_log%message(log_buf)
-       write(log_buf,'(A20,8x,E12.5E2)') 'Estimated tke', &
-            (ue+ve+we)/2.
-       call neko_log%message(log_buf)
-       write(log_buf,'(A24,9x,E12.5E2)') 'Estimated Tu*U_inf', &
-            sqrt((ue+ve+we)/3.)
-       call neko_log%message(log_buf)
       end block
+
+     call neko_log%end_section()
+
     end if ! end if pe_rank .eq. 0
 
     !
@@ -201,10 +194,12 @@ contains
     ! Allocate the missing arrays on all ranks != 0 since the allocation
     ! was done on rank 0 in spec_s
     if (pe_rank .ne. 0) then
+      call neko_log%message("Allocating arrays on non-zero ranks")
       allocate(k_x(n_modes))
       allocate(k_y(n_modes))
       allocate(k_z(n_modes))
       allocate(shell(n_modes))
+      call neko_log%message("Broadcasting generated FST to non-zero ranks")
     end if
 
     call MPI_Bcast(k_x, n_modes, &

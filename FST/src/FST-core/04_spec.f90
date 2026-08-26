@@ -12,7 +12,7 @@ module spec
   use fst_utils, only : ran2
   use utils, only : neko_error
   use fst_utils, only : print_param
-  use logger, only : LOG_SIZE, neko_log
+  use logger, only : LOG_SIZE, neko_log, NEKO_LOG_INFO
 
   implicit none
 
@@ -72,6 +72,7 @@ contains
     ! Generate wavenumbers, this will also give us a definitive value for
     ! Np
     !
+    call neko_log%section("Wavenumbers")
     kk(0) = 0.0_rp
     do i=1,nshells
        ! Fill the total wavenumber vector
@@ -82,10 +83,11 @@ contains
             kk(i),Np,seed)
        Npeff = Np
     end do
-    
+
     !
     ! Allocate the arrays here because they will be filled below
     !
+    call neko_log%message("Allocating arrays kx,ky,kz", lvl=NEKO_LOG_INFO)
     allocate(k_x(Np*2*nshells))
     allocate(k_y(Np*2*nshells))
     allocate(k_z(Np*2*nshells))
@@ -93,8 +95,10 @@ contains
 
     !     Write wavenumbers to ffst_ile
     if (write_files) then
-       open(file=trim(write_file_path) // '/sphere.dat', unit=10)
+       call neko_log%message("Creating file " // trim(write_file_path) // &
+            '/sphere.dat', lvl=NEKO_LOG_INFO)
 
+       open(file=trim(write_file_path) // '/sphere.dat', unit=10)
        write(10,*) 'energy shell parameters'
        write(10,'(a20,i18)') 'Nshells',nshells
        write(10,'(a20,f18.9)') 'k_start',k_start
@@ -107,6 +111,9 @@ contains
     !
     ! Recompute wavenumbers in the periodic directions
     !
+    call neko_log%message("Enforcing periodicity on wavenumbers", &
+         lvl=NEKO_LOG_INFO)
+
     do i=1,nshells
        call periodicity_chk(co(:,i,1),co(:,i,2),co(:,i,3), &
             Np,kk(i), dlx, dly, dlz, periodic_x, periodic_y, periodic_z, seed)
@@ -131,10 +138,13 @@ contains
     ! Remove mode (0,0,0) if it exists, and assign the result to our
     ! arrays kx, ky, kz
     !
+    call neko_log%message("Removing mode (0,0,0) if it exists", &
+      lvl=NEKO_LOG_INFO)
     shell_modes = 0
     z1=0
     z2=0
     l=0
+
     do i=1, nshells
        do j=1, 2*Np
           !         If some modes need to be removed.
@@ -159,14 +169,21 @@ contains
        end do ! j=1,2*Np
     end do ! i=1,nshells
 
-    call neko_log%message('(0,0,0) wavenumber removed')
+    if (z2 .ne. 0) &
+      call neko_log%message('(0,0,0) wavenumber removed', lvl=NEKO_LOG_INFO)
 
-    write(log_buf, *) 'Saved ',z1,' of ',z1+z2, ' fst modes.'
-    call neko_log%message(log_buf)
+    write(log_buf, '(A,I0,A,I0,A)') 'Saved ',z1,' of ',z1+z2, ' fst modes.'
+    call neko_log%message(log_buf, lvl=NEKO_LOG_INFO)
+
+    call neko_log%end_section()
 
     !
     ! Generate amplitudes
     !
+    call neko_log%section('Amplitudes')
+
+    write (log_buf, '(A,F10.6)') "Theoretical TKE, (q) : ", q_theoretical
+    call neko_log%message(log_buf, lvl=NEKO_LOG_INFO)
 
     !  ------ integrate the energy spectrum (mimics continuous integral) ---
     Ndk = 5000 ! just a large no of points on the spectrum
@@ -179,8 +196,8 @@ contains
        q_continuous = q_continuous + ek(k_start + i*dkint, IL, 1._rp)
     end do
     q_continuous = q_continuous*dkint
-    write (log_buf, '(A,F10.6)') 'Truncated, continuous integral of spectrum ', q_continuous
-    call neko_log%message(log_buf)
+    write (log_buf, '(A,F10.6)') 'Truncated integral of spectrum :', q_continuous
+    call neko_log%message(log_buf, lvl=NEKO_LOG_INFO)
     ! ------------------------------------------------------------------------
 
     ! ----- integrate the energy spectrum with nshells points ----------------
@@ -190,11 +207,12 @@ contains
        q_truncated = q_truncated + ek(k_start + (i-1)*dk, IL, 1._rp)
     end do
     q_truncated = q_truncated*dk
-    write (log_buf, '(A,I3.3,A,F10.6)') 'Truncated, discrete integral on ', nshells, ' shells :' , q_truncated
-    call neko_log%message(log_buf)
+    write (log_buf, '(A,I0,A,F10.6)') 'Truncated, discrete integral on ', &
+      nshells, ' shells, (q_hat) :' , q_truncated
+    call neko_log%message(log_buf, lvl=NEKO_LOG_INFO)
     ! -------------------------------------------------------------------------
     
-    call print_param("q0: ", q_theoretical/q_truncated)
+    call print_param("Ratio q / q_hat", q_theoretical/q_truncated, fmt='F10.6')
     
     !
     ! Generate amplitudes
@@ -208,6 +226,9 @@ contains
             (real(shell_modes(i), kind=rp)))
        
     end do
+
+    call neko_log%end_section()
+
 
     return
   end subroutine spec_s

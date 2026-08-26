@@ -476,10 +476,10 @@ contains
       this%k_x, this%k_y, this%k_z, this%n_modes, this%shell, &
       this%shell_amp, this%periodic_x, this%periodic_y, this%periodic_z, &
       this%seed, path, .true., gdim, Lx, Ly, Lz)
+    
+    call neko_log%end_section('')
 
     call this%validate()
-
-    call neko_log%end_section('')
 
   end subroutine FST_generate_common
 
@@ -490,10 +490,14 @@ contains
    character(len=LOG_SIZE) :: log_buf
    integer :: ierr
 
+   if (pe_rank .ne. 0) return
+
+   call neko_log%section("FST diagnostics")
+
    !
    ! Compute min/max wavenumbers
    !
-   call neko_log%section("Generated wavenumbers")
+   call neko_log%section("Wavenumbers")
 
    ! x-direction
    kmin = glmin(abs(this%k_x), this%n_modes)
@@ -513,6 +517,44 @@ contains
    call print_param("(z) min wavelength", 2.0_rp*pi/kmax, fmt='F10.4')
    call print_param("(z) max wavelength", 2.0_rp*pi/kmin, fmt='F10.4')
    call neko_log%end_section()
+
+   !
+   ! From the random vectors and amplitudes, compute estimations of Tu and 
+   ! TKE
+   !
+   call neko_log%section("Amplitudes & rand. vectors")
+
+   block
+    integer :: shellno, i
+    real(kind=rp) :: amp, uamp, vamp, wamp, ue, ve, we
+
+    do i=1, this%n_modes
+      shellno = this%shell(i)
+      amp = this%shell_amp(shellno)
+
+      uamp = this%random_vectors(i,1)*amp
+      vamp = this%random_vectors(i,2)*amp
+      wamp = this%random_vectors(i,3)*amp
+
+      ue = ue + ((uamp)**2.0_rp)/2.0_rp
+      ve = ve + ((vamp)**2.0_rp)/2.0_rp
+      we = we + ((wamp)**2.0_rp)/2.0_rp
+    enddo
+
+    call print_param('Energy in u  ', ue, fmt='E12.6')
+    call print_param('Energy in v  ', ve, fmt='E12.6')
+    call print_param('Energy in w  ', we, fmt='E12.6')
+    call print_param('Target TKE   ', 1.5_rp * this%Uinf**2 * this%Tu**2, fmt='E12.6')
+    call print_param('Estimated TKE', (ue+ve+we)/2.0_rp, fmt='E12.6')
+    call print_param('Target Tu    ', this%Tu, fmt='E12.6')
+    call print_param('Estimated Tu ', sqrt((ue+ve+we)/3.0_rp / this%Uinf), fmt='E12.6')
+
+   end block
+
+   call neko_log%end_section() ! end amplitudes section
+
+
+   call neko_log%end_section() ! end diagnostics section
 
   end subroutine FST_validate
 
