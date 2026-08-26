@@ -72,7 +72,11 @@ contains
     ! Generate wavenumbers, this will also give us a definitive value for
     ! Np
     !
-    call neko_log%section("Wavenumbers")
+    call neko_log%section("Wavenumbers")    
+    if (periodic_y .or. periodic_x .or. periodic_z) &
+      call neko_log%message("Enforcing periodicity on wavenumbers", &
+         lvl=NEKO_LOG_INFO)
+
     kk(0) = 0.0_rp
     do i=1,nshells
        ! Fill the total wavenumber vector
@@ -82,6 +86,10 @@ contains
        call gen_dodeca_k(co(:,i,1), co(:,i,2), co(:,i,3), &
             kk(i),Np,seed)
        Npeff = Np
+
+       call periodicity_chk(co(:,i,1),co(:,i,2),co(:,i,3), &
+            Np,kk(i), dlx, dly, dlz, periodic_x, periodic_y, periodic_z, seed)
+
     end do
 
     !
@@ -109,14 +117,10 @@ contains
     endif
 
     !
-    ! Recompute wavenumbers in the periodic directions
+    ! Remove mode (0,0,0) and mirror modes in x axis
     !
-    call neko_log%message("Enforcing periodicity on wavenumbers", &
-         lvl=NEKO_LOG_INFO)
 
     do i=1,nshells
-       !call periodicity_chk(co(:,i,1),co(:,i,2),co(:,i,3), &
-       !     Np,kk(i), dlx, dly, dlz, periodic_x, periodic_y, periodic_z, seed)
 
        ! add second dodecaeder mirrored at (x)-axis
        do j=Np+1,2*Np
