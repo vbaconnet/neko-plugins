@@ -802,6 +802,7 @@ contains
     rotx = ran2(seed)*2.*pi
     roty = ran2(seed)*2.*pi
     rotz = ran2(seed)*2.*pi
+    print *, ">>>>>>>>>>>>>>>>>", rotx, roty, rotz
     call compute_sphere(Np, kx, ky, kz, K_tot, rotx, roty, rotz, .false.)
 
     return
