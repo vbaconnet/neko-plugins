@@ -13,7 +13,7 @@
       "enabled": false
     },
     "time": {
-      "end_time": 1.5,
+      "end_time": 1e-2,
       "variable_timestep": true,
       "target_cfl": 0.5,
       "timestep": 1e-3,
@@ -37,7 +37,7 @@
       "n_shells": 80,
       "files_output_path": "fst_alloc",
       "n_pts_per_shell": 40,
-      "t_ramp": 0.0001,
+      "t_ramp": 0.001,
       "alpha": 0.1,
       "periodic_z": true
     },
