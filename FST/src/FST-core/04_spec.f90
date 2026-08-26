@@ -797,12 +797,11 @@ contains
     real(kind=rp) :: pi
     real(kind=rp) :: rotx,roty,rotz
 
-    pi = 4.0*atan(1.0)
+    pi = 4.0_rp*atan(1.0_rp)
 
-    rotx = ran2(seed)*2.*pi
-    roty = ran2(seed)*2.*pi
-    rotz = ran2(seed)*2.*pi
-    print *, ">>>>>>>>>>>>>>>>>", rotx, roty, rotz
+    rotx = ran2(seed)*2.0_rp*pi
+    roty = ran2(seed)*2.0_rp*pi
+    rotz = ran2(seed)*2.0_rp*pi
     call compute_sphere(Np, kx, ky, kz, K_tot, rotx, roty, rotz, .false.)
 
     return
