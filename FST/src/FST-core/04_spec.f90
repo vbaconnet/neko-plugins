@@ -81,7 +81,6 @@ contains
     do i=1,nshells
        ! Fill the total wavenumber vector
        kk(i) = k_start + (i-1)*dk ! kk = k_start, k_start+dk, k_start+2dk + ... + k_end
-       print *, dk, kk(i)
        ! Fill            co(1:Np,i,1), co(1:Np,i,2), co(1:Np,i,3)
        call gen_dodeca_k(co(:,i,1), co(:,i,2), co(:,i,3), &
             kk(i),Np,seed)
@@ -718,7 +717,6 @@ contains
     rotx = ran2(seed)*2.0_rp*pi
     roty = ran2(seed)*2.0_rp*pi
     rotz = ran2(seed)*2.0_rp*pi
-    print *, ">>>>>>>>>>>>>>>", rotx, roty, rotz
     call compute_sphere(Np, kx, ky, kz, K_tot, rotx, roty, rotz, .false.)
 
     return

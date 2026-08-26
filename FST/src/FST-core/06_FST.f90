@@ -490,8 +490,6 @@ contains
    character(len=LOG_SIZE) :: log_buf
    integer :: ierr
 
-   if (pe_rank .ne. 0) return
-
    call neko_log%section("FST diagnostics")
 
    !
@@ -522,6 +520,8 @@ contains
    ! From the random vectors and amplitudes, compute estimations of Tu and 
    ! TKE
    !
+   if (pe_rank .ne. 0) return
+   
    call neko_log%section("Amplitudes & rand. vectors")
 
    block
