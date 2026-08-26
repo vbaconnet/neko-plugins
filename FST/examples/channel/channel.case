@@ -13,7 +13,7 @@
       "enabled": false
     },
     "time": {
-      "end_time": 1.5,
+      "end_time": 1e-2,
       "variable_timestep": true,
       "target_cfl": 0.5,
       "timestep": 1e-3,
@@ -27,9 +27,11 @@
 
     "FST": {
       "enabled": true,
-      "t_start": 0.15,
+      "t_start": 0.0,
       "t_ramp": 0.001,
-      "alpha": 0.3,
+      "alpha": 0.1,
+      "ystart": -0.05,
+      "files_output_path": "fst_master",
       "periodic_z": true
     },
 
@@ -59,7 +61,7 @@
         "max_iterations": 50
       },
       "output_control": "tsteps",
-      "output_value": 100,
+      "output_value": 5,
       "boundary_conditions": [
         {
           // inflow
