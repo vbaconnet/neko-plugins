@@ -216,7 +216,6 @@ contains
     ! -------------------------------------------------------------------------
     
     call print_param("Ratio q / q_hat", q_theoretical/q_truncated, fmt='F10.6')
-    print *, "================== q0 ", q_theoretical/q_truncated
 
     !
     ! Generate amplitudes
