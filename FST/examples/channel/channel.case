@@ -5,6 +5,7 @@
     "mesh_file": "channel.nmsh",
     "output_directory": "results",
     "output_at_end": true,
+    "output_precision": "double",
     "output_checkpoints": false,
     "output_boundary": false,
     "checkpoint_control": "simulationtime",
