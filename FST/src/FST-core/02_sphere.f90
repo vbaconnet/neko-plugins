@@ -1,5 +1,6 @@
 module sphere
   use num_types, only : rp
+  use math, only : pi
   use utils, only : neko_error
   use logger, only : LOG_SIZE
   use global_params
@@ -38,8 +39,6 @@ contains
     integer :: l(1000,2)
     character(len=LOG_SIZE) :: log_buf
 
-    real(kind=rp) :: pi
-    pi = 4.0*atan(1.0)
     N = 1000
 
 
@@ -321,17 +320,17 @@ contains
 
        Nn=1
 500    Npn=0
-       dtheta = 2*pi / real(Nn, kind=rp)
+       dtheta = 2.0_rp*pi / real(Nn, kind=rp)
        do j=0, (Nn)/2
           theta=j*dtheta
-          if (sin(theta).eq.0.) then
-             dphi = 99999999.
+          if (sin(theta).eq.0.0_rp) then
+             dphi = 99999999.0_rp
           else
              dphi = dtheta / sin(theta)
           end if
-          Nphir = max(2*pi / dphi ,1._rp)
-          Nphi = Nphir+0.5
-          dphi = 2*pi / real(Nphi, kind=rp)
+          Nphir = max(2.0_rp*pi / dphi ,1._rp)
+          Nphi = Nphir+0.5_rp
+          dphi = 2.0_rp*pi / real(Nphi, kind=rp)
           Npn=Npn+Nphi
        end do
        if (Npn.LE.Np) then
@@ -354,19 +353,19 @@ contains
        end if
 
 
-       dtheta = 2*pi / real(Nn, kind=rp)
+       dtheta = 2.0_rp*pi / real(Nn, kind=rp)
        do j=0, (Nn)/2
           theta=j*dtheta
-          if (sin(theta).eq.0.) then
-             dphi = 99999999.
+          if (sin(theta).eq.0.0_rp) then
+             dphi = 99999999.0_rp
           else
              dphi = dtheta / sin(theta)
           end if
-          Nphir = max(2*pi / dphi ,1._rp)
-          Nphi = Nphir+0.5
-          dphi = 2*pi / real(Nphi, kind=rp)
+          Nphir = max(2.0_rp*pi / dphi ,1._rp)
+          Nphi = Nphir+0.5_rp
+          dphi = 2.0_rp*pi / real(Nphi, kind=rp)
           do i=1, (Nphi)
-             phi=i*dphi
+             phi=real(i, kind=rp)*dphi
              k=k+1
              x(k) = cos(phi)*sin(theta)
              y(k) = sin(phi)*sin(theta)
