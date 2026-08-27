@@ -86,8 +86,8 @@ contains
             kk(i),Np,seed)
        Npeff = Np
 
-       !call periodicity_chk(co(:,i,1),co(:,i,2),co(:,i,3), &
-       !     Np,kk(i), dlx, dly, dlz, periodic_x, periodic_y, periodic_z, seed)
+       call periodicity_chk(co(:,i,1),co(:,i,2),co(:,i,3), &
+           Np,kk(i), dlx, dly, dlz, periodic_x, periodic_y, periodic_z, seed)
 
     end do
 
