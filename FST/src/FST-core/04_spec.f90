@@ -142,8 +142,8 @@ contains
             kk(i),Np,seed)
 
        ! Recompute wavenumbers in the periodic directions
-       !call periodicity_chk(co(1,i,1),co(1,i,2),co(1,i,3), &
-       !     Np,kk(i),dlx,dly,dlz, periodic_x, periodic_y, periodic_z, seed)
+       call periodicity_chk(co(1,i,1),co(1,i,2),co(1,i,3), &
+           Np,kk(i),dlx,dly,dlz, periodic_x, periodic_y, periodic_z, seed)
 
        ! add second dodecaeder mirrored at (x)-axis
        do j=Np+1,2*Np
