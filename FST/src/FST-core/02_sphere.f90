@@ -325,7 +325,7 @@ contains
        do j=0, (Nn)/2
           theta=j*dtheta
           if (sin(theta).eq.0.0_rp) then
-             dphi = 99999999._rp
+             dphi = 99999999.0_rp
           else
              dphi = dtheta / sin(theta)
           end if
@@ -366,7 +366,7 @@ contains
           Nphi = Nphir+0.5_rp
           dphi = 2.0_rp*pi / real(Nphi, kind=rp)
           do i=1, (Nphi)
-             phi=i*dphi
+             phi=real(i, kind=rp)*dphi
              k=k+1
              x(k) = cos(phi)*sin(theta)
              y(k) = sin(phi)*sin(theta)

@@ -5,6 +5,7 @@
     "mesh_file": "channel.nmsh",
     "output_directory": "results_alloc",
     "output_at_end": true,
+    "output_precision": "double",
     "output_checkpoints": false,
     "output_boundary": false,
     "output_precision": "double",
@@ -40,6 +41,11 @@
       "n_pts_per_shell": 40,
       "t_ramp": 0.001,
       "alpha": 0.1,
+      "t_start": 0.0,
+      "t_ramp": 0.001,
+      "alpha": 0.1,
+      "ystart": -0.05,
+      "files_output_path": "fst_master",
       "periodic_z": true
     },
 

@@ -8,6 +8,7 @@
     "output_precision": "double",
     "output_checkpoints": false,
     "output_boundary": false,
+    "output_precision": "double", 
     "checkpoint_control": "simulationtime",
     "checkpoint_value": 1.0,
     "runtime_statistics": {
@@ -15,7 +16,7 @@
     },
     "time": {
       "end_time": 1e-2,
-      "variable_timestep": true,
+      "variable_timestep": false,
       "target_cfl": 0.5,
       "timestep": 5e-4,
       "max_timestep": 0.25e-2
