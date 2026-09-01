@@ -49,7 +49,7 @@ module opr_fst_device
             shell_amp_d, randvec_d, cosa, sina, fringe_time, fs_d) &
             bind(c, name = 'cuda_fst')
        use, intrinsic :: iso_c_binding
-       import c_rp, c_xp
+       import c_dp, c_xp
        type(c_ptr), value :: u_d,v_d,w_d,mask_d,ubf_d,vbf_d,wbf_d,&
             k_x_d, phi_0_d, shell_d, shell_amp_d, randvec_d, fs_d
        real(kind=c_dp) :: t
@@ -64,7 +64,7 @@ module opr_fst_device
             shell_amp_d, randvec_d, cosa, sina, fringe_time, fs_d) &
             bind(c, name = 'hip_fst')
        use, intrinsic :: iso_c_binding
-       import c_rp, c_xp
+       import c_dp, c_xp
        type(c_ptr), value :: u_d,v_d,w_d,mask_d,ubf_d,vbf_d,wbf_d,&
             k_x_d, phi_0_d, shell_d, shell_amp_d, randvec_d, fs_d
        real(kind=c_dp) :: t
