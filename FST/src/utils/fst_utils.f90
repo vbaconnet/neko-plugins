@@ -1,10 +1,10 @@
 module fst_utils
-    use num_types, only : rp
+    use num_types, only : rp, dp, xp, sp
     use logger, only : LOG_SIZE, neko_log
 
 
     interface print_param
-      module procedure print_param_int, print_param_rp, print_param_bool
+      module procedure print_param_int, print_param_sp, print_param_dp, print_param_bool
     end interface print_param
 
 contains
@@ -54,11 +54,11 @@ contains
   end function ran2
 
   ! Use to print one parameter
-  subroutine print_param_rp(name, value, fmt)
+  subroutine print_param_sp(name, value, fmt)
     implicit none
 
     character(len=*), intent(in) :: name
-    real(kind=rp), intent(in) :: value
+    real(kind=sp), intent(in) :: value
     character(len=*), intent(in), optional :: fmt
 
     character(len=LOG_SIZE) :: log_buf
@@ -70,7 +70,26 @@ contains
     write(log_buf, '(A,A,' // trim(fmt_) // ')') name, ": ", value
     call neko_log%message(log_buf)
 
-  end subroutine print_param_rp
+  end subroutine print_param_sp
+
+  ! Use to print one parameter
+  subroutine print_param_dp(name, value, fmt)
+    implicit none
+
+    character(len=*), intent(in) :: name
+    real(kind=dp), intent(in) :: value
+    character(len=*), intent(in), optional :: fmt
+
+    character(len=LOG_SIZE) :: log_buf
+    character(len=128) :: fmt_
+
+    fmt_ = 'g0'
+    if (present(fmt)) fmt_ = trim(fmt)
+
+    write(log_buf, '(A,A,' // trim(fmt_) // ')') name, ": ", value
+    call neko_log%message(log_buf)
+
+  end subroutine print_param_dp
 
   ! Use to print one parameter
   subroutine print_param_int(name, value)

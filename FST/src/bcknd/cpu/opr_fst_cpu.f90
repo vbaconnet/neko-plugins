@@ -42,18 +42,19 @@ contains
 
   !> Compute FST on CPU
   subroutine opr_fst_cpu_fst(t, Uinf, u,v,w, mask,n_mask, &
-       u_baseflow, v_baseflow, w_baseflow, &
-       wavenumbers_x, n_total_modes, phi_0, shell, shell_amplitudes, &
-       random_vectors, cosa, sina, fringe_time, fringe_space)
+            u_baseflow, v_baseflow, w_baseflow, &
+            wavenumbers_x, n_total_modes, phi_0, shell, shell_amplitudes, &
+            random_vectors, cosa, sina, fringe_time, fringe_space)
 
     real(kind=rp), intent(inout), dimension(:,:,:,:) :: u, v, w
+    real(kind=dp), intent(in) :: t
     real(kind=rp), intent(in) :: u_baseflow(:), v_baseflow(:), w_baseflow(:)
     integer, intent(in) :: n_mask, n_total_modes
     integer, intent(in) :: mask(0:n_mask), shell(:)
     real(kind=xp), intent(in), dimension(:) :: wavenumbers_x, shell_amplitudes, &
          fringe_space
     real(kind=xp), intent(in), dimension(:,:) :: phi_0, random_vectors
-    real(kind=xp), intent(in) :: t, Uinf, fringe_time, sina, cosa
+    real(kind=xp), intent(in) :: Uinf, fringe_time, sina, cosa
 
     real(kind=xp) :: phi_t, f, rand_vec(3), pert, urand, vrand, wrand, phi
 
@@ -65,7 +66,7 @@ contains
     do idx = 1, mask(0)
 
        !> This vector will contain the sum of all Fourier modes
-       rand_vec = 0.0_rp
+       rand_vec = 0.0_xp
 
        ! Sum all sin modes for each gll point
        do m = 1, n_total_modes

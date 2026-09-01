@@ -14,7 +14,7 @@ module FST
   use logger, only: LOG_SIZE, neko_log
   use field, only: field_t
   use coefs, only: coef_t
-  use num_types, only: rp
+  use num_types, only: rp, dp, xp
   use utils, only: neko_error
   use point_zone, only: point_zone_t
   use comm, only: pe_rank
@@ -36,34 +36,34 @@ module FST
 
      ! periodic directions
      logical :: periodic_x
-     real(kind=rp) :: Lx
+     real(kind=xp) :: Lx
      logical :: periodic_y
-     real(kind=rp) :: Ly
+     real(kind=xp) :: Ly
      logical :: periodic_z
-     real(kind=rp) :: Lz
+     real(kind=xp) :: Lz
 
      ! x fringe
-     real(kind=rp) :: xmin
-     real(kind=rp) :: xmax
-     real(kind=rp) :: xstart
-     real(kind=rp) :: xend
-     real(kind=rp) :: x_delta_rise
-     real(kind=rp) :: x_delta_fall
+     real(kind=xp) :: xmin
+     real(kind=xp) :: xmax
+     real(kind=xp) :: xstart
+     real(kind=xp) :: xend
+     real(kind=xp) :: x_delta_rise
+     real(kind=xp) :: x_delta_fall
 
      ! y fringe
-     real(kind=rp) :: ymin
-     real(kind=rp) :: ymax
-     real(kind=rp) :: ystart
-     real(kind=rp) :: yend
-     real(kind=rp) :: y_delta_rise
-     real(kind=rp) :: y_delta_fall
+     real(kind=xp) :: ymin
+     real(kind=xp) :: ymax
+     real(kind=xp) :: ystart
+     real(kind=xp) :: yend
+     real(kind=xp) :: y_delta_rise
+     real(kind=xp) :: y_delta_fall
 
      !> Total fringe amplitude
-     real(kind=rp) :: fringe_max
+     real(kind=xp) :: fringe_max
 
      !> Final ramp time
-     real(kind=rp) :: t_end
-     real(kind=rp) :: t_start
+     real(kind=dp) :: t_end
+     real(kind=dp) :: t_start
 
      logical :: is_forcing
      logical :: is_bc
@@ -71,17 +71,17 @@ module FST
      ! ------- 
      ! FST generation parameters
      !> Free-stream velocity
-     real(kind=rp) :: Uinf
+     real(kind=xp) :: Uinf
      !> Turbulence intensity
-     real(kind=rp) :: Tu
+     real(kind=xp) :: Tu
      !> Turbulent length scale
-     real(kind=rp) :: L
+     real(kind=xp) :: L
      !> Number of shells
      integer :: n_shells
      !> Max number of points per shell
      integer :: n_max_pts_per_shell
      !> Start and end bounds of the total wavenumber range
-     real(kind=rp) :: k_start, k_end
+     real(kind=xp) :: k_start, k_end
      !> Effective number of points per shell, usually equal to but sometimes 
      !! lower than n_max_pts_per_shell
      integer :: n_eff_pts_per_shell = 0
@@ -89,26 +89,26 @@ module FST
      integer :: n_modes = 0
      
      !> Random, divergence-free unit vectors
-     real(kind=rp), allocatable :: random_vectors(:,:) ! u_hat_pn but reshaped
+     real(kind=xp), allocatable :: random_vectors(:,:) ! u_hat_pn but reshaped
      type(c_ptr) :: random_vectors_d = C_NULL_PTR
      !> Map to the total wavenumber id/shell
      integer, allocatable :: shell(:)
      type(c_ptr) :: shell_d = C_NULL_PTR
      !> Amplitude of mode on a given shell
-     real(kind=rp), allocatable :: shell_amp(:)
+     real(kind=xp), allocatable :: shell_amp(:)
      type(c_ptr) :: shell_amp_d = C_NULL_PTR
 
      !> Wavenumbers in the x,y,z direction
-     real(kind=rp), allocatable :: k_x(:)
-     real(kind=rp), allocatable :: k_y(:)
-     real(kind=rp), allocatable :: k_z(:)
+     real(kind=xp), allocatable :: k_x(:)
+     real(kind=xp), allocatable :: k_y(:)
+     real(kind=xp), allocatable :: k_z(:)
      type(c_ptr) :: k_x_d = C_NULL_PTR
 
-     real(kind=rp), allocatable :: phase_shifts(:)
+     real(kind=xp), allocatable :: phase_shifts(:)
      ! -------
 
      !> Fringe in space
-     real(kind=rp), allocatable :: fringe_space(:)
+     real(kind=xp), allocatable :: fringe_space(:)
      type(c_ptr) :: fringe_space_d = C_NULL_PTR
 
      !> Baseflows, if applying on a non-uniform inflow
@@ -120,7 +120,7 @@ module FST
      type(c_ptr) :: w_baseflow_d = C_NULL_PTR
 
      !> Variable that is precomputed to save some time
-     real(kind=rp), allocatable :: phi_0(:,:)
+     real(kind=xp), allocatable :: phi_0(:,:)
      type(c_ptr) :: phi_0_d = C_NULL_PTR
 
    contains
@@ -160,15 +160,15 @@ contains
        t_start, t_ramp, &
        seed)
     class(FST_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: Uinf, Tu, L, k_start, k_end
+    real(kind=xp), intent(in) :: Uinf, Tu, L, k_start, k_end
     integer, intent(in) :: Nshells, Npmax
-    real(kind=rp), intent(in) :: xmin, xmax, xstart, xend
-    real(kind=rp), intent(in) :: ymin, ymax, ystart, yend
-    real(kind=rp), intent(in) :: x_delta_rise, x_delta_fall
-    real(kind=rp), intent(in) :: y_delta_rise, y_delta_fall
-    real(kind=rp), intent(in) :: fringe_max
-    real(kind=rp), intent(in) :: t_start
-    real(kind=rp), intent(in) :: t_ramp
+    real(kind=xp), intent(in) :: xmin, xmax, xstart, xend
+    real(kind=xp), intent(in) :: ymin, ymax, ystart, yend
+    real(kind=xp), intent(in) :: x_delta_rise, x_delta_fall
+    real(kind=xp), intent(in) :: y_delta_rise, y_delta_fall
+    real(kind=xp), intent(in) :: fringe_max
+    real(kind=dp), intent(in) :: t_start
+    real(kind=dp), intent(in) :: t_ramp
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
     integer, intent(inout), optional :: seed
 
@@ -264,14 +264,14 @@ contains
        seed)
 
     class(FST_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: Uinf, Tu, L, k_start, k_end
+    real(kind=xp), intent(in) :: Uinf, Tu, L, k_start, k_end
     integer, intent(in) :: Nshells, Npmax
-    real(kind=rp), intent(in) :: xmin, xmax, xstart, xend
-    real(kind=rp), intent(in) :: ymin, ymax, ystart, yend
-    real(kind=rp), intent(in) :: x_delta_rise, x_delta_fall
-    real(kind=rp), intent(in) :: y_delta_rise, y_delta_fall
-    real(kind=rp), intent(in) :: t_start
-    real(kind=rp), intent(in) :: t_end
+    real(kind=xp), intent(in) :: xmin, xmax, xstart, xend
+    real(kind=xp), intent(in) :: ymin, ymax, ystart, yend
+    real(kind=xp), intent(in) :: x_delta_rise, x_delta_fall
+    real(kind=xp), intent(in) :: y_delta_rise, y_delta_fall
+    real(kind=dp), intent(in) :: t_start
+    real(kind=dp), intent(in) :: t_end
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
     integer, intent(inout), optional :: seed
 
@@ -281,7 +281,7 @@ contains
        periodic_x, periodic_y, periodic_z, &
        xmin, xmax, xstart, xend, x_delta_rise, x_delta_fall, &
        ymin, ymax, ystart, yend, y_delta_rise, y_delta_fall, &
-       1.0_rp, &
+       1.0_xp, &
        t_start, t_end, &
        seed)
 
@@ -462,7 +462,7 @@ contains
     class(FST_t), intent(inout) :: this
     character(len=*), intent(in) :: path
     integer, intent(in) :: gdim
-    real(kind=rp), intent(in), optional :: Lx, Ly, Lz
+    real(kind=xp), intent(in), optional :: Lx, Ly, Lz
 
     integer :: ierr
 
@@ -486,7 +486,7 @@ contains
   subroutine FST_validate(this)
    class(FST_t), intent(in) :: this
 
-   real(kind=rp) :: kmin, kmax
+   real(kind=xp) :: kmin, kmax
    character(len=LOG_SIZE) :: log_buf
    integer :: ierr
 
@@ -498,20 +498,20 @@ contains
    call neko_log%section("Wavenumbers")
 
    ! x-direction
-   kmin = glmin(abs(this%k_x), this%n_modes)
-   kmax = glmax(abs(this%k_x), this%n_modes)
+   kmin = glmin(real( abs(this%k_x), kind=rp), this%n_modes)
+   kmax = glmax(real( abs(this%k_x), kind=rp), this%n_modes)
    call print_param("(x) min wavelength", 2.0_rp*pi/kmax, fmt='F10.4')
    call print_param("(x) max wavelength", 2.0_rp*pi/kmin, fmt='F10.4')
 
    ! y-direction
-   kmin = glmin(abs(this%k_y), this%n_modes)
-   kmax = glmax(abs(this%k_y), this%n_modes)
+   kmin = glmin(real( abs(this%k_y), kind=rp), this%n_modes)
+   kmax = glmax(real( abs(this%k_y), kind=rp), this%n_modes)
    call print_param("(y) min wavelength", 2.0_rp*pi/kmax, fmt='F10.4')
    call print_param("(y) max wavelength", 2.0_rp*pi/kmin, fmt='F10.4')
 
    ! z-direction
-   kmin = glmin(abs(this%k_z), this%n_modes)
-   kmax = glmax(abs(this%k_z), this%n_modes)
+   kmin = glmin(real( abs(this%k_z), kind=rp), this%n_modes)
+   kmax = glmax(real( abs(this%k_z), kind=rp), this%n_modes)
    call print_param("(z) min wavelength", 2.0_rp*pi/kmax, fmt='F10.4')
    call print_param("(z) max wavelength", 2.0_rp*pi/kmin, fmt='F10.4')
    call neko_log%end_section()
@@ -526,7 +526,7 @@ contains
 
    block
     integer :: shellno, i
-    real(kind=rp) :: amp, uamp, vamp, wamp, ue, ve, we
+    real(kind=xp) :: amp, uamp, vamp, wamp, ue, ve, we
 
     do i=1, this%n_modes
       shellno = this%shell(i)
@@ -611,7 +611,8 @@ contains
     character(len=*), intent(in) :: path
     integer, intent(in) :: gdim
 
-    real(kind=rp) :: x, y, z, ymin, ymax, zmin, zmax, Ly, Lz
+    real(kind=rp) :: x, y, z, ymin, ymax, zmin, zmax
+    real(kind=xp) :: Ly, Lz
     integer :: ierr, i, idx, m, j
 
     !
@@ -812,12 +813,12 @@ contains
     integer, intent(in) :: n ! size of the bc mask
     integer, intent(in) :: bc_mask(0:n)
     real(kind=rp), intent(in), dimension(:,:,:,:) :: x, y, z
-    real(kind=rp), intent(in) :: t
+    real(kind=dp), intent(in) :: t
     real(kind=rp), intent(inout), dimension(:,:,:,:) :: u_bc, v_bc, w_bc
-    real(kind=rp), intent(in) :: angleXY
+    real(kind=xp), intent(in) :: angleXY
     logical, intent(in) :: on_host
 
-    real(kind=rp) :: fringe_time
+    real(kind=xp) :: fringe_time
 
     fringe_time = time_ramp(t, this%t_end, this%t_start)
 
@@ -899,18 +900,18 @@ contains
   !
   ! Linear ramp in time
   function time_ramp(t, t_end, t_start) result(ramp)
-    real(kind=rp), intent(in) :: t
-    real(kind=rp), intent(in) :: t_end
-    real(kind=rp), intent(in) :: t_start
+    real(kind=dp), intent(in) :: t
+    real(kind=dp), intent(in) :: t_end
+    real(kind=dp), intent(in) :: t_start
 
-    real(kind=rp) :: ramp
+    real(kind=dp) :: ramp
 
     if (t .le. t_start) then
-       ramp = 0.0_rp
+       ramp = 0.0_dp
     else if (t .lt. t_end) then
        ramp = (t - t_start)/(t_end - t_start)
     else
-       ramp = 1.0_rp
+       ramp = 1.0_dp
     end if
 
   end function time_ramp
@@ -936,7 +937,7 @@ contains
     real(kind=rp), intent(in) :: x
     real(kind=rp), intent(in), optional :: y
     type(FST_t), intent(in) :: f
-    real(kind=rp) :: fr
+    real(kind=xp) :: fr
     integer :: i
     character :: a
 
@@ -950,8 +951,8 @@ contains
 
   ! Smooth step function, 0 if x <= 0, 1 if x >= 1, 1/erp(1/(x-1) + 1/x) between 0 and 1
   function S(x) result(y)
-    real(kind=rp), intent(in) :: x
-    real(kind=rp) :: y
+    real(kind=xp), intent(in) :: x
+    real(kind=xp) :: y
 
     if ( x.le.0._rp ) then
        y = 0._rp

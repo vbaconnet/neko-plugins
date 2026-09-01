@@ -47,7 +47,7 @@ contains
 
   !> Initialize user variables or external objects
   subroutine fst_bc_driver_initialize(t, u, v, w, p, coef, params)
-    real(kind=rp) :: t
+    real(kind=dp) :: t
     type(field_t), intent(inout) :: u
     type(field_t), intent(inout) :: v
     type(field_t), intent(inout) :: w
@@ -56,10 +56,10 @@ contains
     type(json_file), intent(inout) :: params
 
     logical :: px, py, pz
-    real(kind=rp) :: x, ymin, ymax, zmin, zmax, delta_y, delta_z, Ly, Lz
-    real(kind=rp) :: ystart, yend, zstart, zend
+    real(kind=xp) :: ymin, ymax, zmin, zmax, delta_y, delta_z, Ly, Lz
+    real(kind=xp) :: ystart, yend, zstart, zend
     integer :: i, ierr, n
-    real(kind=rp) :: alpha
+    real(kind=xp) :: alpha
     alpha = 0.1
 
     n = coef%dof%size()
@@ -100,7 +100,8 @@ contains
     ! Read all FST parameters
     !
     block
-      real(kind=rp) :: Uinf, Tu, L, k_start, k_end, t_ramp, t_start
+      real(kind=xp) :: Uinf, Tu, L, k_start, k_end
+      real(kind=dp) :: t_ramp, t_start
       integer :: Nshells, Npmax, seed
 
       call json_get_or_default(params, "case.FST.seed", seed, -143)
@@ -115,7 +116,7 @@ contains
       call json_get(params, "case.FST.n_pts_per_shell", Npmax)
 
       ! Read parameters for the FST fringe in time
-      call json_get_or_default(params, "case.FST.t_start", t_start, 0.0_rp)
+      call json_get_or_default(params, "case.FST.t_start", t_start, 0.0_dp)
       call json_get(params, "case.FST.t_ramp", t_ramp)
 
       call FST_OBJ%init_bc(Uinf, Tu, L, k_start, k_end, Nshells, Npmax, &
@@ -138,9 +139,9 @@ contains
     type(field_t), intent(inout) :: w
     class(bc_t), intent(in) :: bc
     type(coef_t), intent(inout) :: coef
-    real(kind=rp), intent(in) :: t
+    real(kind=dp), intent(in) :: t
     integer, intent(in) :: tstep
-    real(kind=rp), intent(in) :: angle
+    real(kind=xp), intent(in) :: angle
     logical, intent(in), optional :: on_cpu
 
     integer :: i, idx

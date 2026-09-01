@@ -8,7 +8,7 @@ module spec
   use sphere, only: compute_sphere
   use spectrum, only: ek
   !use global_params
-  use num_types, only: rp
+  use num_types, only: rp, xp
   use fst_utils, only : ran2
   use utils, only : neko_error
   use fst_utils, only : print_param
@@ -23,14 +23,14 @@ contains
        periodic_z, seed, write_file_path, write_files)
 
     integer, intent(out) :: Npeff
-    real(kind=rp), intent(in) :: IL, Tu, U_inf
+    real(kind=xp), intent(in) :: IL, Tu, U_inf
     integer, intent(in) :: Npmax
     integer, intent(in) :: Nshells
-    real(kind=rp), intent(in) :: k_start, k_end
-    real(kind=rp), allocatable, intent(inout) :: k_x(:), k_y(:), k_z(:)
+    real(kind=xp), intent(in) :: k_start, k_end
+    real(kind=xp), allocatable, intent(inout) :: k_x(:), k_y(:), k_z(:)
     integer, allocatable, intent(inout) :: shell(:)
-    real(kind=rp), intent(inout) :: shell_amp(nshells)
-    real(kind=rp), intent(in) :: dlx, dly, dlz
+    real(kind=xp), intent(inout) :: shell_amp(nshells)
+    real(kind=xp), intent(in) :: dlx, dly, dlz
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
     integer, intent(inout) :: seed
     character(len=*), intent(in) :: write_file_path
@@ -45,7 +45,7 @@ contains
     !     Npmax  -  Number of points in a shell
     !     Nsmax  -  Number of shells
 
-    real(kind=rp) :: k2
+    real(kind=xp) :: k2
 
     integer start, Ndk
 
@@ -55,18 +55,18 @@ contains
     integer z1,z2
     !integer :: seed
 
-    real(kind=rp) :: dk, dkint
+    real(kind=xp) :: dk, dkint
 
-    real(kind=rp) :: co(2*Npmax,nshells,3)
-    real(kind=rp) :: kk(0:nshells)
-    real(kind=rp) :: q_truncated, q_continuous
-    real(kind=rp) :: q(Nshells) ! tke in each shell
+    real(kind=xp) :: co(2*Npmax,nshells,3)
+    real(kind=xp) :: kk(0:nshells)
+    real(kind=xp) :: q_truncated, q_continuous
+    real(kind=xp) :: q(Nshells) ! tke in each shell
 
-    real(kind=rp) :: q_theoretical ! Theoretical TKE
+    real(kind=xp) :: q_theoretical ! Theoretical TKE
     
     Np = Npmax
-    dk = (k_end - k_start)/real(nshells-1, kind=rp)
-    q_theoretical = (3.0_rp/2.0_rp*(Tu*U_inf)**2.0_rp) ! = 3/2 * Tu**2 * Uinf**2
+    dk = (k_end - k_start)/real(nshells-1, kind=xp)
+    q_theoretical = (3.0_xp/2.0_xp*(Tu*U_inf)**2.0_xp) ! = 3/2 * Tu**2 * Uinf**2
 
     !
     ! Generate wavenumbers, this will also give us a definitive value for
@@ -77,7 +77,7 @@ contains
       call neko_log%message("Enforcing periodicity on wavenumbers", &
          lvl=NEKO_LOG_INFO)
 
-    kk(0) = 0.0_rp
+    kk(0) = 0.0_xp
     do i=1,nshells
        ! Fill the total wavenumber vector
        kk(i) = k_start + (i-1)*dk ! kk = k_start, k_start+dk, k_start+2dk + ... + k_end
@@ -193,10 +193,10 @@ contains
     dkint = (k_end-k_start)/float(Ndk)
 
     ! Include the bounds first
-    q_continuous = ek(k_start, IL, 1.0_rp) + ek(k_end, IL, 1.0_rp)
+    q_continuous = ek(k_start, IL, 1.0_xp) + ek(k_end, IL, 1.0_xp)
 
     do i=1,Ndk-1
-       q_continuous = q_continuous + ek(k_start + i*dkint, IL, 1._rp)
+       q_continuous = q_continuous + ek(k_start + i*dkint, IL, 1._xp)
     end do
     q_continuous = q_continuous*dkint
     write (log_buf, '(A,F10.6)') 'Truncated integral of spectrum :', q_continuous
@@ -205,9 +205,9 @@ contains
 
     ! ----- integrate the energy spectrum with nshells points ----------------
     ! This is the "discretized" energy.
-    q_truncated = 0.0_rp
+    q_truncated = 0.0_xp
     do i=1,nshells
-       q_truncated = q_truncated + ek(k_start + (i-1)*dk, IL, 1._rp)
+       q_truncated = q_truncated + ek(k_start + (i-1)*dk, IL, 1._xp)
     end do
     q_truncated = q_truncated*dk
     write (log_buf, '(A,I0,A,F10.6)') 'Truncated, discrete integral on ', &
@@ -225,8 +225,8 @@ contains
        ! Generate local TKE
        q(i) = ek(kk(i), IL, q_theoretical/q_truncated)
 
-       shell_amp(i) = sqrt(2.0_rp * q(i)*dk * 2.0_rp / &
-            (real(shell_modes(i), kind=rp)))
+       shell_amp(i) = sqrt(2.0_xp * q(i)*dk * 2.0_xp / &
+            (real(shell_modes(i), kind=xp)))
        
     end do
 
@@ -243,17 +243,17 @@ contains
   !! kp is the array of wavenumbers in the periodic direction. kp is filled
   !! with wavenumbers that are multiple of 2pi/Lp, so kp = n*2pi/Lp
   subroutine make_periodic_1D(k1, k2, kp, np, K_total, Lp, seed)
-    real(kind=rp), intent(inout) :: k1(:), k2(:), kp(:)
+    real(kind=xp), intent(inout) :: k1(:), k2(:), kp(:)
     integer, intent(in) :: np
-    real(kind=rp), intent(in) :: K_total
-    real(kind=rp), intent(in) :: Lp
+    real(kind=xp), intent(in) :: K_total
+    real(kind=xp), intent(in) :: Lp
     integer, intent(inout) :: seed
 
     integer :: nmax, nmin, n_j, n_j_signed, j
-    real(kind=rp) :: twopi_over_L, rtmp, flip, K_total_sq
+    real(kind=xp) :: twopi_over_L, rtmp, flip, K_total_sq
 
-    twopi_over_L = 2.0_rp * pi / Lp
-    K_total_sq = K_total**2.0_rp
+    twopi_over_L = 2.0_xp * pi / Lp
+    K_total_sq = K_total**2.0_xp
 
     !
     ! First, check if we can fix at least one wavenumber in the direction Lp
@@ -276,18 +276,18 @@ contains
 
        ! how many multiples of 2pi/L can fit in this direction
        n_j = floor( abs(kp(j)) / twopi_over_L)
-       n_j_signed = sign(1.0_rp, kp(j)) * floor( abs(kp(j)) / twopi_over_L)
+       n_j_signed = sign(1.0_xp, kp(j)) * floor( abs(kp(j)) / twopi_over_L)
 
        if (n_j .gt. nmax) then
-          n_j_signed = n_j_signed - sign(1.0_rp, kp(j))
+          n_j_signed = n_j_signed - sign(1.0_xp, kp(j))
 
        elseif (n_j .eq. 0) then
           ! Force to not be zero
-          n_j_signed = n_j_signed + sign(1.0_rp, kp(j))
+          n_j_signed = n_j_signed + sign(1.0_xp, kp(j))
        endif
 
        ! Set the discrete wavenumber
-       kp(j) = real(n_j_signed, kind=rp) * twopi_over_L
+       kp(j) = real(n_j_signed, kind=xp) * twopi_over_L
 
        !
        ! Now we need to adjust the other wavenumbers to make sure we still get
@@ -302,28 +302,28 @@ contains
        if (flip .gt. 0.5_rp) then
 
           !k1(j) = k1(j)       ! k1 stays the same
-          rtmp = K_total_sq - k1(j)**2.0_rp - kp(j)**2.0_rp
+          rtmp = K_total_sq - k1(j)**2.0_xp - kp(j)**2.0_xp
 
           if (rtmp .gt. 1) then
-             k2(j) = sign(1.0_rp, k2(j))*sqrt(rtmp)
+             k2(j) = sign(1.0_xp, k2(j))*sqrt(rtmp)
           else
-             rtmp = sqrt((K_total_sq - kp(j)**2.0_rp)/2.0_rp)
-             k1(j) = sign(1.0_rp,k1(j))*rtmp
-             k2(j) = sign(1.0_rp,k2(j))*rtmp
+             rtmp = sqrt((K_total_sq - kp(j)**2.0_xp)/2.0_xp)
+             k1(j) = sign(1.0_xp,k1(j))*rtmp
+             k2(j) = sign(1.0_xp,k2(j))*rtmp
           endif
 
           ! < 0.5 means we fix k2 and recompute k1
        else
 
           !k2(j) = k2(j)       ! k2 stays the same
-          rtmp = K_total_sq - kp(j)**2.0_rp - k2(j)**2.0_rp
+          rtmp = K_total_sq - kp(j)**2.0_xp - k2(j)**2.0_xp
 
           if (rtmp .gt. 1) then
-             k1(j) = sign(1.0_rp, k1(j)) * sqrt(rtmp)
+             k1(j) = sign(1.0_xp, k1(j)) * sqrt(rtmp)
           else
-             rtmp = sqrt((K_total_sq - kp(j)**2.0_rp)/2.0_rp)
-             k1(j) = sign(1.0_rp,k1(j))*rtmp
-             k2(j) = sign(1.0_rp,k2(j))*rtmp
+             rtmp = sqrt((K_total_sq - kp(j)**2.0_xp)/2.0_xp)
+             k1(j) = sign(1.0_xp,k1(j))*rtmp
+             k2(j) = sign(1.0_xp,k2(j))*rtmp
           endif
 
        endif ! flip
@@ -335,19 +335,19 @@ contains
   !! kp1 and kp2 periodic, based on the lengths Lp1 and Lp2.
   !! See make_periodic_1D for more details.
   subroutine make_periodic_2D(k1, kp1, kp2, np, K_total, L1, L2)
-    real(kind=rp), intent(inout) :: k1(:), kp1(:), kp2(:)
+    real(kind=xp), intent(inout) :: k1(:), kp1(:), kp2(:)
     integer, intent(in) :: np
-    real(kind=rp), intent(in) :: K_total
-    real(kind=rp), intent(in) :: L1, L2
+    real(kind=xp), intent(in) :: K_total
+    real(kind=xp), intent(in) :: L1, L2
 
     integer :: nmax, nmin, n_j1, n_j1_signed, j
     integer :: n_j2, n_j2_signed, n_signed_cand
-    real(kind=rp) :: twopi_over_L1, twopi_over_L2, rtmp, K_total_sq, flip
+    real(kind=xp) :: twopi_over_L1, twopi_over_L2, rtmp, K_total_sq, flip
     logical :: valid_config
 
-    twopi_over_L1 = 2.0_rp * pi / L1
-    twopi_over_L2 = 2.0_rp * pi / L2
-    K_total_sq = K_total**2.0_rp
+    twopi_over_L1 = 2.0_xp * pi / L1
+    twopi_over_L2 = 2.0_xp * pi / L2
+    K_total_sq = K_total**2.0_xp
 
     !
     ! First, check if we can fix at least one wavenumber in the direction Lp
@@ -391,31 +391,31 @@ contains
 
        ! ---- Set the discrete wavenumber in direction 1
        n_j1 = floor( abs(kp1(j)) / twopi_over_L1)
-       n_j1_signed = sign(1.0_rp, kp1(j)) * floor( abs(kp1(j)) / twopi_over_L1)
+       n_j1_signed = sign(1.0_xp, kp1(j)) * floor( abs(kp1(j)) / twopi_over_L1)
 
        if (n_j1 .gt. nmax) then
-          n_j1_signed = n_j1_signed - sign(1.0_rp, kp1(j))
+          n_j1_signed = n_j1_signed - sign(1.0_xp, kp1(j))
 
        elseif (n_j1 .eq. 0) then
           ! Force to not be zero
-          n_j1_signed = n_j1_signed + sign(1.0_rp, kp1(j))
+          n_j1_signed = n_j1_signed + sign(1.0_xp, kp1(j))
        endif
 
-       kp1(j) = real(n_j1_signed, kind=rp) * twopi_over_L1
+       kp1(j) = real(n_j1_signed, kind=xp) * twopi_over_L1
 
        ! ---- Set the discrete wavenumber in direction 2
        n_j2 = floor( abs(kp2(j)) / twopi_over_L2)
-       n_j2_signed = sign(1.0_rp, kp2(j)) * floor( abs(kp2(j)) / twopi_over_L2)
+       n_j2_signed = sign(1.0_xp, kp2(j)) * floor( abs(kp2(j)) / twopi_over_L2)
 
        if (n_j2 .gt. nmax) then
-          n_j2_signed = n_j2_signed - sign(1.0_rp, kp2(j))
+          n_j2_signed = n_j2_signed - sign(1.0_xp, kp2(j))
 
        elseif (n_j2 .eq. 0) then
           ! Force to not be zero
-          n_j2_signed = n_j2_signed + sign(1.0_rp, kp2(j))
+          n_j2_signed = n_j2_signed + sign(1.0_xp, kp2(j))
        endif
 
-       kp2(j) = real(n_j2_signed, kind=rp) * twopi_over_L2
+       kp2(j) = real(n_j2_signed, kind=xp) * twopi_over_L2
 
        !
        ! Now we need to adjust the other wavenumbers to make sure we still get
@@ -425,26 +425,26 @@ contains
 
        ! warning: rtmp can be negative! In that case we need to adjust the values
        ! of nj1 and/or nj2 until we can get something.
-       rtmp = K_total_sq - kp1(j)**2.0_rp - kp2(j)**2.0_rp
-       valid_config = (rtmp .gt. 1.0_rp)
+       rtmp = K_total_sq - kp1(j)**2.0_xp - kp2(j)**2.0_xp
+       valid_config = (rtmp .gt. 1.0_xp)
 
        do while (.not. valid_config)
          
           ! Always reduce the component that is highest
           if (kp1(j) .gt. kp2(j)) then
-             n_j1_signed = n_j1_signed - sign(1.0_rp, kp1(j))
-             kp1(j) = real(n_j1_signed, kind=rp) * twopi_over_L1
+             n_j1_signed = n_j1_signed - sign(1.0_xp, kp1(j))
+             kp1(j) = real(n_j1_signed, kind=xp) * twopi_over_L1
           else
-             n_j2_signed = n_j2_signed - sign(1.0_rp, kp2(j))
-             kp2(j) = real(n_j2_signed, kind=rp) * twopi_over_L2
+             n_j2_signed = n_j2_signed - sign(1.0_xp, kp2(j))
+             kp2(j) = real(n_j2_signed, kind=xp) * twopi_over_L2
           end if
 
-          rtmp = K_total_sq - kp1(j)**2.0_rp - kp2(j)**2.0_rp
-          valid_config = (rtmp .gt. 0.0_rp)
+          rtmp = K_total_sq - kp1(j)**2.0_xp - kp2(j)**2.0_xp
+          valid_config = (rtmp .gt. 0.0_xp)
 
        end do
 
-       k1(j) = sign(1.0_rp, k1(j)) * sqrt( rtmp )
+       k1(j) = sign(1.0_xp, k1(j)) * sqrt( rtmp )
 
     enddo
 
@@ -453,18 +453,18 @@ contains
 
   subroutine periodicity_chk(kx, ky, kz, np, kk, dlx, dly, dlz, ifxp, ifyp, &
        ifzp, seed)
-    real(kind=rp), intent(inout) :: kx(:), ky(:), kz(:)
+    real(kind=xp), intent(inout) :: kx(:), ky(:), kz(:)
     integer, intent(in) :: np
-    real(kind=rp), intent(in) :: kk
-    real(kind=rp), intent(in) :: dlx,dly,dlz
+    real(kind=xp), intent(in) :: kk
+    real(kind=xp), intent(in) :: dlx,dly,dlz
     logical, intent(in) :: ifxp,ifyp,ifzp
     integer, intent(inout) :: seed
 
     ! integer :: i,j
     ! integer :: nmax,nmin,kn
 
-    ! real(kind=rp) :: flip, k2
-    ! real(kind=rp) :: rtmp
+    ! real(kind=xp) :: flip, k2
+    ! real(kind=xp) :: rtmp
     ! k2 = kk**2
 
     logical :: periodic_1d, periodic_2d
@@ -507,45 +507,45 @@ contains
     !   nmin = 1
     !   if (nmax.lt.nmin) then
     !     call neko_log%message('Check allowed wavenumbers in FST')
-    !     call print_param('nmax:', real(nmax, kind=rp))
-    !     call print_param('nmin:', real(nmin, kind=rp))
+    !     call print_param('nmax:', real(nmax, kind=xp))
+    !     call print_param('nmin:', real(nmin, kind=xp))
     !     call print_param('k   :', kk)
     !     call exit
     !   endif
 
     !   do j=1,np
     !     !          kn = nint(kx(j)*dlx/(2.0*pi))
-    !     kn = sign(1.0_rp, kx(j)) * floor(abs(kx(j))*dlx/(2.0_rp*pi))  ! always
+    !     kn = sign(1.0_xp, kx(j)) * floor(abs(kx(j))*dlx/(2.0_xp*pi))  ! always
     !     ! make k
     !     ! smaller
 
     !     if (abs(kn).gt.nmax) then
-    !       kn=kn-sign(1.0_rp,kx(j))
+    !       kn=kn-sign(1.0_xp,kx(j))
     !     elseif (abs(kn).eq.0) then
-    !       kn=kn+sign(1.0_rp,kx(j))
+    !       kn=kn+sign(1.0_xp,kx(j))
     !     endif
-    !     kx(j)=real(kn)*2.0_rp*pi/dlx
+    !     kx(j)=real(kn)*2.0_xp*pi/dlx
 
     !     flip = ran2(seed)            ! coin toss
     !     if (flip.gt.0.5_rp) then
     !       ky(j) = ky(j)       ! ky stays the same
-    !       rtmp = k2-ky(j)**2.0_rp-kx(j)**2.0_rp
+    !       rtmp = k2-ky(j)**2.0_xp-kx(j)**2.0_xp
     !       if (rtmp.gt.1) then
-    !         kz(j) = sign(1.0_rp,kz(j))*sqrt(rtmp)
+    !         kz(j) = sign(1.0_xp,kz(j))*sqrt(rtmp)
     !       else
-    !         rtmp = sqrt((k2-kx(j)**2.0_rp)/2.0_rp)
-    !         ky(j) = sign(1.0_rp,ky(j))*rtmp
-    !         kz(j) = sign(1.0_rp,kz(j))*rtmp
+    !         rtmp = sqrt((k2-kx(j)**2.0_xp)/2.0_xp)
+    !         ky(j) = sign(1.0_xp,ky(j))*rtmp
+    !         kz(j) = sign(1.0_xp,kz(j))*rtmp
     !       endif
     !     else
     !       kz(j) = kz(j)       ! kz stays the same
-    !       rtmp = k2-kx(j)**2.0_rp-kz(j)**2.0_rp
+    !       rtmp = k2-kx(j)**2.0_xp-kz(j)**2.0_xp
     !       if (rtmp.gt.1) then
-    !         ky(j) = sign(1.0_rp,ky(j))*sqrt(rtmp)
+    !         ky(j) = sign(1.0_xp,ky(j))*sqrt(rtmp)
     !       else
-    !         rtmp = sqrt((k2-kx(j)**2.0_rp)/2.0_rp)
-    !         ky(j) = sign(1.0_rp,ky(j))*rtmp
-    !         kz(j) = sign(1.0_rp,kz(j))*rtmp
+    !         rtmp = sqrt((k2-kx(j)**2.0_xp)/2.0_xp)
+    !         ky(j) = sign(1.0_xp,ky(j))*rtmp
+    !         kz(j) = sign(1.0_xp,kz(j))*rtmp
     !       endif
     !     endif       ! flip
     !   enddo         ! j=1,Np
@@ -554,27 +554,27 @@ contains
 
     ! if (ifyp) then
     !   call neko_log%message('Checking periodicity in y')
-    !   nmax = floor(kk*dly/(2.0_rp*pi))
+    !   nmax = floor(kk*dly/(2.0_xp*pi))
     !   nmin = 1
     !   if (nmax.lt.nmin) then
     !     call neko_log%message('Check allowed wavenumbers in FST')
-    !     call print_param('nmax:', real(nmax, kind=rp))
-    !     call print_param('nmin:', real(nmin, kind=rp))
+    !     call print_param('nmax:', real(nmax, kind=xp))
+    !     call print_param('nmin:', real(nmin, kind=xp))
     !     call print_param('k   :', kk)
     !     call exit
     !   endif
 
     !   do j=1,np
     !     !          kn = nint(ky(j)*dly/(2.0*pi))
-    !     kn = sign(1.0_rp,ky(j))*floor(abs(ky(j))*dly/(2.0*pi))  ! always
+    !     kn = sign(1.0_xp,ky(j))*floor(abs(ky(j))*dly/(2.0*pi))  ! always
     !     ! make k
     !     ! smaller
 
 
     !     if (abs(kn).gt.nmax) then
-    !       kn=kn-sign(1.0_rp,ky(j))
+    !       kn=kn-sign(1.0_xp,ky(j))
     !       elseif (abs(kn).eq.0) then
-    !         kn=kn+sign(1.0_rp,ky(j))
+    !         kn=kn+sign(1.0_xp,ky(j))
     !       endif
     !       ky(j)=real(kn)*2.0*pi/dly
 
@@ -583,21 +583,21 @@ contains
     !         kz(j) = kz(j)       ! kz stays the same
     !         rtmp = k2-ky(j)**2.-kz(j)**2.
     !         if (rtmp.gt.1) then
-    !           kx(j) = sign(1.0_rp,kx(j))*sqrt(rtmp)
+    !           kx(j) = sign(1.0_xp,kx(j))*sqrt(rtmp)
     !         else
     !           rtmp = sqrt((k2-ky(j)**2.)/2.)
-    !           kx(j) = sign(1.0_rp,kx(j))*rtmp
-    !           kz(j) = sign(1.0_rp,kz(j))*rtmp
+    !           kx(j) = sign(1.0_xp,kx(j))*rtmp
+    !           kz(j) = sign(1.0_xp,kz(j))*rtmp
     !         endif
     !       else
     !         kx(j) = kx(j)       ! kx stays the same
     !         rtmp = k2-ky(j)**2.-kx(j)**2.
     !         if (rtmp.gt.1) then
-    !           kz(j) = sign(1.0_rp,kz(j))*sqrt(rtmp)
+    !           kz(j) = sign(1.0_xp,kz(j))*sqrt(rtmp)
     !         else
     !           rtmp = sqrt((k2-ky(j)**2.)/2.)
-    !           kx(j) = sign(1.0_rp,kx(j))*rtmp
-    !           kz(j) = sign(1.0_rp,kz(j))*rtmp
+    !           kx(j) = sign(1.0_xp,kx(j))*rtmp
+    !           kz(j) = sign(1.0_xp,kz(j))*rtmp
     !         endif
     !       endif       ! flip
     !     enddo         ! j=1,Np
@@ -610,43 +610,43 @@ contains
     !       nmin = 1
     !       if (nmax.lt.nmin) then
     !         call neko_log%message('Check allowed wavenumbers in FST')
-    !         call print_param('nmax:', real(nmax, kind=rp))
-    !         call print_param('nmin:', real(nmin, kind=rp))
+    !         call print_param('nmax:', real(nmax, kind=xp))
+    !         call print_param('nmin:', real(nmin, kind=xp))
     !         call print_param('k   :', kk)
     !         call exit
     !       endif
 
     !       do j=1,np
-    !         kn = sign(1.0_rp,kz(j))*floor(abs(kz(j))*dlz/(2.0*pi))  ! always
+    !         kn = sign(1.0_xp,kz(j))*floor(abs(kz(j))*dlz/(2.0*pi))  ! always
     !         ! make k
     !         ! smaller
     !         if (abs(kn).gt.nmax) then
-    !           kn=kn-sign(1.0_rp,kz(j))
+    !           kn=kn-sign(1.0_xp,kz(j))
     !           elseif (abs(kn).eq.0) then
-    !             kn=kn+sign(1.0_rp,kz(j))
+    !             kn=kn+sign(1.0_xp,kz(j))
     !           endif
     !           kz(j)=real(kn)*2.0*pi/dlz
 
     !           flip = ran2(seed)            ! coin toss
     !           if (flip.gt.0.5) then
     !             kx(j) = kx(j)       ! kx stays the same
-    !             rtmp = k2-kx(j)**2.0_rp-kz(j)**2.0_rp
+    !             rtmp = k2-kx(j)**2.0_xp-kz(j)**2.0_xp
     !             if (rtmp.gt.1) then
-    !               ky(j) = sign(1.0_rp,ky(j))*sqrt(rtmp)
+    !               ky(j) = sign(1.0_xp,ky(j))*sqrt(rtmp)
     !             else
     !               rtmp = sqrt((k2-kz(j)**2.)/2.)
-    !               kx(j) = sign(1.0_rp,kx(j))*rtmp
-    !               ky(j) = sign(1.0_rp,ky(j))*rtmp
+    !               kx(j) = sign(1.0_xp,kx(j))*rtmp
+    !               ky(j) = sign(1.0_xp,ky(j))*rtmp
     !             endif
     !           else
     !             ky(j) = ky(j)       ! ky stays the same
-    !             rtmp = k2-ky(j)**2.0_rp-kz(j)**2.0_rp
+    !             rtmp = k2-ky(j)**2.0_xp-kz(j)**2.0_xp
     !             if (rtmp.gt.1) then
-    !               kx(j) = sign(1.0_rp,kx(j))*sqrt(rtmp)
+    !               kx(j) = sign(1.0_xp,kx(j))*sqrt(rtmp)
     !             else
-    !               rtmp = sqrt((k2-kz(j)**2.0_rp)/2.0_rp)
-    !               kx(j) = sign(1.0_rp,kx(j))*rtmp
-    !               ky(j) = sign(1.0_rp,ky(j))*rtmp
+    !               rtmp = sqrt((k2-kz(j)**2.0_xp)/2.0_xp)
+    !               kx(j) = sign(1.0_xp,kx(j))*rtmp
+    !               ky(j) = sign(1.0_xp,ky(j))*rtmp
     !             endif
     !           endif       ! flip
 
@@ -663,14 +663,14 @@ contains
     implicit none
 
     integer Np
-    real(kind=rp) :: kx(1),ky(1),kz(1)
-    real(kind=rp) :: kk
-    real(kind=rp) :: kmax,kmin
-    real(kind=rp) :: theta,phi
+    real(kind=xp) :: kx(1),ky(1),kz(1)
+    real(kind=xp) :: kk
+    real(kind=xp) :: kmax,kmin
+    real(kind=xp) :: theta,phi
 
     integer i,seed
 
-    real(kind=rp) :: twopi
+    real(kind=xp) :: twopi
     logical inbounds
 
     twopi = 2.0*4.0*atan(1.0)
@@ -706,27 +706,27 @@ contains
   !> NOTE: This modifies the value of Np!
   subroutine gen_dodeca_k(kx, ky, kz, K_tot, Np, seed)
 
-    real(kind=rp), intent(inout) :: kx(:),ky(:),kz(:)
-    real(kind=rp), intent(in) :: K_tot
+    real(kind=xp), intent(inout) :: kx(:),ky(:),kz(:)
+    real(kind=xp), intent(in) :: K_tot
     integer, intent(inout) :: Np
     integer, intent(in) :: seed
 
-    real(kind=rp) :: rotx,roty,rotz
+    real(kind=xp) :: rotx,roty,rotz
 
-    rotx = ran2(seed)*2.0_rp*pi
-    roty = ran2(seed)*2.0_rp*pi
-    rotz = ran2(seed)*2.0_rp*pi
+    rotx = ran2(seed)*2.0_xp*pi
+    roty = ran2(seed)*2.0_xp*pi
+    rotz = ran2(seed)*2.0_xp*pi
     call compute_sphere(Np, kx, ky, kz, K_tot, rotx, roty, rotz, .false.)
 
     return
   end subroutine gen_dodeca_k
 
   !----------------------------------------------------------------------
-  real(kind=rp) function vlamin(vec,n)
-    real(kind=rp) :: VEC(1)
+  real(kind=xp) function vlamin(vec,n)
+    real(kind=xp) :: VEC(1)
     integer, intent(in) :: n
     integer :: i
-    real(kind=rp) :: TMIN
+    real(kind=xp) :: TMIN
     TMIN = 99.0E20
 
     do 100 I=1,N
@@ -736,11 +736,11 @@ contains
     return
   end function vlamin
 
-  real(kind=rp) function vlamax(vec,n)
-    real(kind=rp) :: VEC(1)
+  real(kind=xp) function vlamax(vec,n)
+    real(kind=xp) :: VEC(1)
     integer, intent(in) :: n
     integer :: i
-    real(kind=rp) :: TMAX
+    real(kind=xp) :: TMAX
     TMAX = 99.0E20
 
     do 100 I=1,N

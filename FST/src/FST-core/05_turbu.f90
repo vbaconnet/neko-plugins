@@ -1,5 +1,5 @@
 module turbu
-  use num_types, only: rp
+  use num_types, only: rp, xp
   use fst_utils, only : ran2
   use math, only: pi, abscmp
   use utils, only: neko_error
@@ -8,7 +8,7 @@ module turbu
   use spec, only: spec_s
   use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN, MPI_INTEGER, MPI_Bcast, &
    MPI_Allreduce
-  use comm, only: pe_rank, MPI_REAL_PRECISION, NEKO_COMM
+  use comm, only: pe_rank, MPI_EXTRA_PRECISION, NEKO_COMM
   implicit none
 
 
@@ -20,37 +20,37 @@ contains
        k_x, k_y, k_z, n_modes, shell, shell_amp, periodic_x, periodic_y, &
        periodic_z, seed, write_file_path, write_files, gdim, Lx, Ly, Lz)
     
-    real(kind=rp), allocatable :: phase_shifts(:)
-    real(kind=rp), allocatable :: random_vectors(:,:)
+    real(kind=xp), allocatable :: phase_shifts(:)
+    real(kind=xp), allocatable :: random_vectors(:,:)
     integer, intent(out) :: Npeff
-    real(kind=rp), intent(in) :: IL, Tu, U_inf
+    real(kind=xp), intent(in) :: IL, Tu, U_inf
     integer, intent(in) :: Npmax
     integer, intent(in) :: Nshells
-    real(kind=rp), intent(in) :: k_start, k_end
-    real(kind=rp), allocatable, intent(inout) :: k_x(:), k_y(:), k_z(:)
+    real(kind=xp), intent(in) :: k_start, k_end
+    real(kind=xp), allocatable, intent(inout) :: k_x(:), k_y(:), k_z(:)
     integer, intent(inout) :: n_modes ! n_modes = k_length
     integer, allocatable, intent(inout) :: shell(:)
-    real(kind=rp), intent(inout) :: shell_amp(Nshells)
+    real(kind=xp), intent(inout) :: shell_amp(Nshells)
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
     integer, intent(inout) :: seed
     character(len=*), intent(in) :: write_file_path
     logical, intent(in) :: write_files
     integer, intent(in) :: gdim
-    real(kind=rp), intent(in), optional :: Lx, Ly, Lz
+    real(kind=xp), intent(in), optional :: Lx, Ly, Lz
 
     integer :: k,i,j, ierr
     integer :: shellno
-    real(kind=rp) :: ue,ve,we
-    real(kind=rp) :: uamp,vamp,wamp, u_dot_k, norm_ki
-    real(kind=rp) :: amp
-    real(kind=rp) :: u_hat(3), u_hat_p(3)
+    real(kind=xp) :: ue,ve,we
+    real(kind=xp) :: uamp,vamp,wamp, u_dot_k, norm_ki
+    real(kind=xp) :: amp
+    real(kind=xp) :: u_hat(3), u_hat_p(3)
     character(len=LOG_SIZE) :: log_buf
 
-    if (periodic_x .and. abscmp(Lx, 0.0_rp)) &
+    if (periodic_x .and. abscmp(Lx, 0.0_xp)) &
       call neko_error("Periodic in x requested but total length is zero!")
-    if (periodic_y .and. abscmp(Ly, 0.0_rp)) &
+    if (periodic_y .and. abscmp(Ly, 0.0_xp)) &
       call neko_error("Periodic in y requested but total length is zero!")
-    if (periodic_z .and. abscmp(Lz, 0.0_rp)) &
+    if (periodic_z .and. abscmp(Lz, 0.0_xp)) &
       call neko_error("Periodic in z requested but total length is zero!")
 
     !
@@ -106,7 +106,7 @@ contains
             ! original code
             do i=1,2*Npmax*Nshells 
 
-               bb(i,k) = ran2(seed)*2.0_rp*pi ! random phase shift
+               bb(i,k) = ran2(seed)*2.0_xp*pi ! random phase shift
 
                ! Load phase_shifts, but careful with the bounds
                ! if Npmax < Np, we risk overflow
@@ -203,23 +203,23 @@ contains
     end if
 
     call MPI_Bcast(k_x, n_modes, &
-         MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
+         MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr)
     call MPI_Bcast(k_y, n_modes, &
-         MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
+         MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr)
     call MPI_Bcast(k_z, n_modes, &
-         MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
+         MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr)
 
     call MPI_Bcast(random_vectors, n_modes*3, &
-         MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
+         MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr)
 
     call MPI_Bcast(phase_shifts, n_modes, &
-         MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
+         MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr)
 
     call MPI_Bcast(shell, n_modes, &
          MPI_INTEGER , 0, NEKO_COMM, ierr)
 
     call MPI_Bcast(shell_amp, Nshells , &
-         MPI_REAL_PRECISION, 0, NEKO_COMM, ierr)
+         MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr)
 
     return
   end subroutine make_turbu

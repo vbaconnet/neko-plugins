@@ -1,5 +1,5 @@
 module spectrum
-  use num_types, only: rp
+  use num_types, only: xp
   implicit none
 
 contains
@@ -9,11 +9,11 @@ contains
   !! @param L Integral length scale.
   !! @param q Turbulence intensity.
   function ek(k,L,q) result(E)
-    real(kind=rp), intent(in) :: k, L, q
-    real(kind=rp) :: E
+    real(kind=xp), intent(in) :: k, L, q
+    real(kind=xp) :: E
 
-    E = 2._rp/3._rp*q*1.606_rp * (k*L)**4._rp * L / &
-         (1.350_rp+(k*L)**2._rp)**(17._rp/6._rp)
+    E = 2._xp/3._xp*q*1.606_xp * (k*L)**4._xp * L / &
+         (1.350_xp+(k*L)**2._xp)**(17._xp/6._xp)
   end function ek
 
 end module spectrum
