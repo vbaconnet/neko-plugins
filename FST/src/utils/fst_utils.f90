@@ -22,8 +22,8 @@ contains
 
     integer idum,ir(97),m,ia,ic,iff,iy,j
     real rm
-    real(kind=rp) :: res
-    parameter (m=714025,ia=1366,ic=150889,rm=1./m)
+    real(kind=xp) :: res
+    parameter (m=714025,ia=1366,ic=150889,rm=1.0_xp/real(m, kind=xp))
     save iff,ir,iy
     data iff /0/
 
