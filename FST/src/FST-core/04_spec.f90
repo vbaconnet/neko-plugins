@@ -30,7 +30,7 @@ contains
     real(kind=xp), allocatable, intent(inout) :: k_x(:), k_y(:), k_z(:)
     integer, allocatable, intent(inout) :: shell(:)
     real(kind=xp), intent(inout) :: shell_amp(nshells)
-    real(kind=xp), intent(in) :: dlx, dly, dlz
+    real(kind=rp), intent(in) :: dlx, dly, dlz
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
     integer, intent(inout) :: seed
     character(len=*), intent(in) :: write_file_path
@@ -246,7 +246,7 @@ contains
     real(kind=xp), intent(inout) :: k1(:), k2(:), kp(:)
     integer, intent(in) :: np
     real(kind=xp), intent(in) :: K_total
-    real(kind=xp), intent(in) :: Lp
+    real(kind=rp), intent(in) :: Lp
     integer, intent(inout) :: seed
 
     integer :: nmax, nmin, n_j, n_j_signed, j
@@ -338,7 +338,7 @@ contains
     real(kind=xp), intent(inout) :: k1(:), kp1(:), kp2(:)
     integer, intent(in) :: np
     real(kind=xp), intent(in) :: K_total
-    real(kind=xp), intent(in) :: L1, L2
+    real(kind=rp), intent(in) :: L1, L2
 
     integer :: nmax, nmin, n_j1, n_j1_signed, j
     integer :: n_j2, n_j2_signed, n_signed_cand
@@ -456,7 +456,7 @@ contains
     real(kind=xp), intent(inout) :: kx(:), ky(:), kz(:)
     integer, intent(in) :: np
     real(kind=xp), intent(in) :: kk
-    real(kind=xp), intent(in) :: dlx,dly,dlz
+    real(kind=rp), intent(in) :: dlx,dly,dlz
     logical, intent(in) :: ifxp,ifyp,ifzp
     integer, intent(inout) :: seed
 

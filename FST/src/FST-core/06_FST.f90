@@ -462,7 +462,7 @@ contains
     class(FST_t), intent(inout) :: this
     character(len=*), intent(in) :: path
     integer, intent(in) :: gdim
-    real(kind=xp), intent(in), optional :: Lx, Ly, Lz
+    real(kind=rp), intent(in), optional :: Lx, Ly, Lz
 
     integer :: ierr
 
@@ -612,7 +612,7 @@ contains
     integer, intent(in) :: gdim
 
     real(kind=rp) :: x, y, z, ymin, ymax, zmin, zmax
-    real(kind=xp) :: Ly, Lz
+    real(kind=rp) :: Ly, Lz
     integer :: ierr, i, idx, m, j
 
     !

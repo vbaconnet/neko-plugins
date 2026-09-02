@@ -36,7 +36,7 @@ contains
     character(len=*), intent(in) :: write_file_path
     logical, intent(in) :: write_files
     integer, intent(in) :: gdim
-    real(kind=xp), intent(in), optional :: Lx, Ly, Lz
+    real(kind=rp), intent(in), optional :: Lx, Ly, Lz
 
     integer :: k,i,j, ierr
     integer :: shellno
@@ -45,13 +45,29 @@ contains
     real(kind=xp) :: amp
     real(kind=xp) :: u_hat(3), u_hat_p(3)
     character(len=LOG_SIZE) :: log_buf
+    real(kind=rp) :: Lx_, Ly_, Lz_
 
-    if (periodic_x .and. abscmp(Lx, 0.0_xp)) &
-      call neko_error("Periodic in x requested but total length is zero!")
-    if (periodic_y .and. abscmp(Ly, 0.0_xp)) &
-      call neko_error("Periodic in y requested but total length is zero!")
-    if (periodic_z .and. abscmp(Lz, 0.0_xp)) &
-      call neko_error("Periodic in z requested but total length is zero!")
+    if (present(Lx)) then
+      if (periodic_x .and. abscmp(Lx, 0.0_rp)) &
+        call neko_error("Periodic in x requested but total length is zero!")
+      Lx_ = Lx
+    else
+      Lx_ = 1.0_rp
+    end if
+    if (present(Ly)) then
+      if (periodic_y .and. abscmp(Ly, 0.0_rp)) &
+        call neko_error("Periodic in y requested but total length is zero!")
+      Ly_ = Ly
+    else
+      Ly_ = 1.0_rp
+    end if
+    if (present(Lz)) then
+      if (periodic_z .and. abscmp(Lz, 0.0_rp)) &
+        call neko_error("Periodic in z requested but total length is zero!")
+      Lz_ = Lz
+    else
+      Lz_ = 1.0_rp
+    end if
 
     !
     ! Generate wavenumbers on rank 0
@@ -70,7 +86,7 @@ contains
        ! these arrays! That is why after the end if we allocate the arrays on
        ! all other ranks.
        call spec_s(Npeff, IL, Tu, U_inf, Npmax, Nshells, k_start, k_end, &
-         k_x, k_y, k_z, shell, shell_amp, Lx, Ly, Lz, periodic_x, periodic_y, &
+         k_x, k_y, k_z, shell, shell_amp, Lx_, Ly_, Lz_, periodic_x, periodic_y, &
          periodic_z, seed, write_file_path, write_files) ! get isotropically distributed wavenumbers in spheres
 
        ! This will be the total size of our arrays
