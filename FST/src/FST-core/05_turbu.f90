@@ -46,12 +46,18 @@ contains
     real(kind=rp) :: u_hat(3), u_hat_p(3)
     character(len=LOG_SIZE) :: log_buf
 
-    if (periodic_x .and. abscmp(Lx, 0.0_rp)) &
-      call neko_error("Periodic in x requested but total length is zero!")
-    if (periodic_y .and. abscmp(Ly, 0.0_rp)) &
-      call neko_error("Periodic in y requested but total length is zero!")
-    if (periodic_z .and. abscmp(Lz, 0.0_rp)) &
-      call neko_error("Periodic in z requested but total length is zero!")
+    if (present(Lx)) then
+      if (periodic_x .and. abscmp(Lx, 0.0_rp)) &
+        call neko_error("Periodic in x requested but total length is zero!")
+    end if
+    if (present(Ly)) then
+      if (periodic_y .and. abscmp(Ly, 0.0_rp)) &
+        call neko_error("Periodic in y requested but total length is zero!")
+    end if
+    if (present(Lz)) then
+      if (periodic_z .and. abscmp(Lz, 0.0_rp)) &
+        call neko_error("Periodic in z requested but total length is zero!")
+    end if
 
     !
     ! Generate wavenumbers on rank 0
