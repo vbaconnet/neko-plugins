@@ -7,6 +7,9 @@ module fst_utils
       module procedure print_param_int, print_param_sp, print_param_dp, print_param_bool
     end interface print_param
 
+
+    real(kind=xp), parameter :: pi = 4._xp * atan(1._xp)
+
 contains
 
     !> A simple portable random number generator

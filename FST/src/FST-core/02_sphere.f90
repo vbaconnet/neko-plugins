@@ -1,10 +1,8 @@
 module sphere
   use num_types, only : xp
-  use math, only : pi
   use utils, only : neko_error
-  use fst_utils, only : print_param
+  use fst_utils, only : print_param, pi
   use logger, only : LOG_SIZE, neko_log
-  !use global_params
   implicit none
 
 contains
@@ -346,10 +344,10 @@ contains
           if (Np.ne.Npn) then
              write(log_buf, *) 'number of points is not exactly the same...'
              call neko_log%message(log_buf)
-             call print_param('Np ', real(Np, kind=xp))
-             call print_param('Npn', real(Npn, kind=xp))
+             call print_param('Np ', Np)
+             call print_param('Npn', Npn)
           else
-             call print_param('Np', real(Np, kind=xp))
+             call print_param('Np', Np)
           end if
        end if
 

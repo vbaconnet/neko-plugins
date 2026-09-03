@@ -4,12 +4,10 @@
 !----------------------------------------------------------------------
 
 module spec
-  use math
   use sphere, only: compute_sphere
   use spectrum, only: ek
-  !use global_params
   use num_types, only: rp, xp
-  use fst_utils, only : ran2
+  use fst_utils, only : ran2, pi
   use utils, only : neko_error
   use fst_utils, only : print_param
   use logger, only : LOG_SIZE, neko_log, NEKO_LOG_INFO
@@ -110,7 +108,7 @@ contains
        write(10,'(a20,i18)') 'Nshells',nshells
        write(10,'(a20,f18.9)') 'k_start',k_start
        write(10,'(a20,f18.9)') 'k_end',k_end
-       write(10,'(a20,i18)') 'Np',Np
+       write(10,'(a20,i18)') 'Np',Npmax
        write(10,*) 'isotropic coordinates'
        write(10,'(2a5,3a18)') 'i','j','x','y','z'
     endif

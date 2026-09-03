@@ -18,9 +18,9 @@ module fst_bc_driver
   character(len=LOG_SIZE) :: LOG_BUF
   ! ============================================================================
 
-  logical :: ENABLED
+  logical :: ENABLED = .false.
+  logical :: READ_FROM_FILES = .false.
   logical :: FST_GENERATED = .false.
-
 
   !
   ! For outputting the forcing as a field file
@@ -103,27 +103,54 @@ contains
       real(kind=xp) :: Uinf, Tu, L, k_start, k_end
       real(kind=dp) :: t_ramp, t_start
       integer :: Nshells, Npmax, seed
+      character(len=:), allocatable :: read_path
 
-      call json_get_or_default(params, "case.FST.seed", seed, -143)
-      if (seed .ge. 0) call neko_error("Seed must be negative!")
-
-      call json_get(params, "case.FST.Uinf", Uinf)
-      call json_get(params, "case.FST.Tu", Tu)
-      call json_get(params, "case.FST.L", L)
-      call json_get(params, "case.FST.k_start", k_start)
-      call json_get(params, "case.FST.k_end", k_end)
-      call json_get(params, "case.FST.n_shells", Nshells)
-      call json_get(params, "case.FST.n_pts_per_shell", Npmax)
+      logical :: found_fst_config
+      call json_get_or_default(params, "case.FST.read_from_files", &
+        READ_FROM_FILES, .false.)
 
       ! Read parameters for the FST fringe in time
       call json_get_or_default(params, "case.FST.t_start", t_start, 0.0_dp)
       call json_get(params, "case.FST.t_ramp", t_ramp)
 
-      call FST_OBJ%init_bc(Uinf, Tu, L, k_start, k_end, Nshells, Npmax, &
-         px, py, pz, zmin, zmax, zstart, zend, delta_z, delta_z, &
-         ymin, ymax, ystart, yend, delta_y, delta_y, &
-         t_start, t_ramp, &
-         seed)
+      if (READ_FROM_FILES) then
+
+        call json_get(params, "case.FST.read_files_path", read_path)
+
+        if (params%valid_path("case.FST.Uinf")) then
+
+          call json_get(params, "case.FST.Uinf", Uinf)
+          call FST_OBJ%init_bc(read_path, px, py, pz, zmin, zmax, zstart, zend, delta_z, delta_z, &
+            ymin, ymax, ystart, yend, delta_y, delta_y, &
+            t_start, t_ramp, Uinf=Uinf)
+
+        else
+
+          call FST_OBJ%init_bc(read_path, px, py, pz, zmin, zmax, zstart, zend, delta_z, delta_z, &
+            ymin, ymax, ystart, yend, delta_y, delta_y, &
+            t_start, t_ramp)
+        end if
+
+      else
+
+        call json_get_or_default(params, "case.FST.seed", seed, -143)
+        if (seed .ge. 0) call neko_error("Seed must be negative!")
+
+        call json_get(params, "case.FST.Uinf", Uinf)
+        call json_get(params, "case.FST.Tu", Tu)
+        call json_get(params, "case.FST.L", L)
+        call json_get(params, "case.FST.k_start", k_start)
+        call json_get(params, "case.FST.k_end", k_end)
+        call json_get(params, "case.FST.n_shells", Nshells)
+        call json_get(params, "case.FST.n_pts_per_shell", Npmax)
+
+        call FST_OBJ%init_bc(Uinf, Tu, L, k_start, k_end, Nshells, Npmax, &
+          px, py, pz, zmin, zmax, zstart, zend, delta_z, delta_z, &
+          ymin, ymax, ystart, yend, delta_y, delta_y, &
+          t_start, t_ramp, &
+          seed)
+
+      end if
 
     end block
 
@@ -154,7 +181,7 @@ contains
     !
     if (.not. FST_GENERATED) then
        call FST_obj%generate_bc(coef%dof%x, coef%dof%y, coef%dof%z, &
-         bc%msk, bc%msk(0), u, v, w, PATH, coef%msh%gdim)
+         bc%msk, bc%msk(0), u, v, w, PATH, coef%msh%gdim, READ_FROM_FILES)
        FST_GENERATED = .true.
     end if
 

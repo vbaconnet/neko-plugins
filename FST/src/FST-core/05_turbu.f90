@@ -1,7 +1,8 @@
 module turbu
   use num_types, only: rp, xp
-  use fst_utils, only : ran2
-  use math, only: pi, abscmp
+  use fst_utils, only : ran2, pi
+  use utils, only : NEKO_FNAME_LEN
+  use math, only: abscmp
   use utils, only: neko_error
   use logger, only: LOG_SIZE, neko_log
   use coefs, only: coef_t
@@ -74,9 +75,6 @@ contains
     !
     if ( pe_rank .eq. 0 ) then
 
-       if (write_files) open(unit=137,form='formatted', &
-            file=trim(write_file_path) // '/bb.txt')
-
        ! 
        ! Generate wavenumbers distributed on spheres
        ! note that Npmax may get modified
@@ -110,11 +108,12 @@ contains
       block
 
          ! Temporary arrays for random generation
-         real(kind=rp) :: bb(2*Npmax*Nshells, 3), bb1(2*Npmax*Nshells, 3)
+         real(kind=xp) :: bb(2*Npmax*Nshells, 3), bb1(2*Npmax*Nshells, 3)
 
          call neko_log%section("Unit vectors & phase shifts")
          call neko_log%message("Generating random phase shifts in [0;2pi]")
          call neko_log%message("Generating random vector components in [-1;1]")
+         
          do k=1, gdim
 
             ! this loop should be done with Npeff instead BUT we keep it this way
@@ -128,14 +127,13 @@ contains
                ! if Npmax < Np, we risk overflow
                if (i .le. n_modes) phase_shifts(i) = bb(i,1)
 
-               bb1(i,k) = 2.0*ran2(seed)-1.0 ! random amplitude
-
-               if (write_files) write(137,*) bb(i,1), bb1(i,1)
+               bb1(i,k) = 2.0_xp*ran2(seed)-1.0_xp ! random amplitude
             enddo
             
          enddo
 
-       if (write_files) close(137)
+       ! Output random values to file
+       call write_bb(write_file_path, bb(:,1), bb1(:,1))
 
        !
        ! Enforce continuity on the random unit vectors
@@ -172,32 +170,10 @@ contains
        !
        ! Write generated modes and amplitudes to file
        !
-       if (write_files) then
-          call neko_log%message("Writing generated vectors in " // &
-                    trim(write_file_path) // '/fst_spectrum.csv')
-
-          open(file=trim(write_file_path) // '/fst_spectrum.csv', unit=13)
-          write(13,'(9(A, ","),A)') 'ShellNo','kx','ky','kz', &
-               'u_amp','v_amp','w_amp','u_hat_pn1','u_hat_pn2', 'u_hat_pn3'
-       end if
-
-       do i=1, n_modes
-          shellno = shell(i)
-          amp = shell_amp(shellno)
-
-          uamp = random_vectors(i,1)*amp
-          vamp = random_vectors(i,2)*amp
-          wamp = random_vectors(i,3)*amp
-
-          if (write_files) write(13,'(9(g0, ","), g0)') shellno, k_x(i), &
-            k_y(i), k_z(i), uamp, vamp, wamp, random_vectors(i,1), &
-            random_vectors(i,2), random_vectors(i,3)
-
-       enddo
-
-       if (write_files) close(13)
-
-      end block
+       call write_fst_spectrum(write_file_path, shell, k_x, k_y, k_z, &
+               shell_amp, random_vectors)
+      
+      end block ! end bb, bb1
 
      call neko_log%end_section()
 
@@ -240,5 +216,77 @@ contains
     return
   end subroutine make_turbu
   !----------------------------------------------------------------------
+
+  subroutine write_bb(path, rand_phase, rand_amp, name)
+    character(len=*), intent(in) :: path
+    real(kind=xp), intent(in) :: rand_phase(:)
+    real(kind=xp), intent(in), optional :: rand_amp(:)
+    character(len=*), intent(in), optional :: name
+
+    integer :: unit, ierr, i, n
+
+    character(len=NEKO_FNAME_LEN) :: name_
+
+    name_ = "bb.txt"
+    if (present(name)) name_ = trim(name)
+
+    call neko_log%message("Writing " // trim(path) // "/" // trim(name_))
+    open(file = trim(path)//'/'//trim(name_), newunit=unit, &
+          status="replace", action="write", iostat=ierr)
+
+    if (ierr .ne. 0) call neko_error("Error opening file " // trim(name_))
+
+    n = size(rand_phase)
+
+    if (present(rand_amp)) then
+       do i = 1, n
+          write(unit, *) rand_phase(i), rand_amp(i)
+       end do
+    else
+       do i = 1, n
+          write(unit, *) rand_phase(i), 0.0_xp
+       end do
+    end if
+
+    close(unit)
+
+  end subroutine write_bb
+
+  subroutine write_fst_spectrum(path, shell, k_x, k_y, k_z, shell_amp, &
+                  r_vec, name)
+    character(len=*), intent(in) :: path
+    integer, intent(in) :: shell(:)
+    real(kind=xp), intent(in) :: k_x(:), k_y(:), k_z(:), shell_amp(:)
+    real(kind=xp), intent(in) :: r_vec(:,:)
+    character(len=*), intent(in), optional :: name
+
+    integer :: unit, ierr, i, n, shellno
+    real(kind=xp) :: amp
+
+    character(len=NEKO_FNAME_LEN) :: name_
+
+    name_ = "fst_spectrum.csv"
+    if (present(name)) name_ = trim(name)
+
+    call neko_log%message("Writing " // trim(path) // "/" // trim(name_))
+    open(file = trim(path)//'/'//trim(name_), newunit=unit, &
+          status="replace", action="write", iostat=ierr)
+
+    if (ierr .ne. 0) call neko_error("Error opening file " // trim(name_))
+
+    write(unit,'(7(A, ","),A)') 'ShellNo','kx','ky','kz', &
+      'amp','u_hat_pn1','u_hat_pn2', 'u_hat_pn3'
+
+    do i = 1, size(k_x)
+     shellno = shell(i)
+     amp = shell_amp(shellno)
+
+      write(unit,'(7(g0, ","), g0)') shellno, k_x(i), k_y(i), k_z(i), amp, &
+              r_vec(i,1), r_vec(i,2), r_vec(i,3)
+    end do
+
+    close(unit)
+
+  end subroutine write_fst_spectrum
 
 end module turbu
