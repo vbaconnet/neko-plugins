@@ -22,7 +22,7 @@ module FST
   use device_math, only: device_masked_gather_copy_0
   use device, only: device_map, device_memcpy, HOST_TO_DEVICE, device_unmap
   use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN, MPI_INTEGER, MPI_Bcast, &
-      MPI_Allreduce
+      MPI_Allreduce, MPI_LOGICAL
   use comm, only: MPI_REAL_PRECISION, MPI_EXTRA_PRECISION, NEKO_COMM
   use device, only: device_get_ptr
   use neko_config, only: NEKO_BCKND_DEVICE
@@ -297,7 +297,11 @@ contains
            this%Uinf = Uinf
         end if
     end if
-    
+   
+    if (this%periodic_x .neqv. px) call neko_error("Unmatching periodicity in x")
+    if (this%periodic_y .neqv. py) call neko_error("Unmatching periodicity in y")
+    if (this%periodic_z .neqv. pz) call neko_error("Unmatching periodicity in z")
+
     this%periodic_x = px
     this%periodic_y = py
     this%periodic_z = pz
@@ -686,6 +690,22 @@ contains
 
     call MPI_Bcast(this%n_modes, 1, MPI_INTEGER, 0, NEKO_COMM, ierr)
     call MPI_Bcast(this%n_shells, 1, MPI_INTEGER, 0, NEKO_COMM, ierr)
+
+    call MPI_Bcast(found_fst_config, 1, MPI_LOGICAL, 0, NEKO_COMM, ierr)
+    
+    if (found_fst_config) then
+      call MPI_Bcast(this%Uinf, 1, MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr) 
+      call MPI_Bcast(this%Tu, 1, MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr) 
+      call MPI_Bcast(this%L, 1, MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr) 
+      call MPI_Bcast(this%k_start, 1, MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr) 
+      call MPI_Bcast(this%k_end, 1, MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr) 
+      call MPI_Bcast(this%n_max_pts_per_shell, 1, MPI_INTEGER, 0, NEKO_COMM, ierr)
+      call MPI_Bcast(this%n_eff_pts_per_shell, 1, MPI_INTEGER, 0, NEKO_COMM, ierr)
+      call MPI_Bcast(this%periodic_x, 1, MPI_LOGICAL, 0, NEKO_COMM, ierr)
+      call MPI_Bcast(this%periodic_y, 1, MPI_LOGICAL, 0, NEKO_COMM, ierr)
+      call MPI_Bcast(this%periodic_z, 1, MPI_LOGICAL, 0, NEKO_COMM, ierr)
+      call MPI_Bcast(this%seed, 1, MPI_INTEGER, 0, NEKO_COMM, ierr)
+    end if
 
     !
     ! Allocate all the relevant arrays:
