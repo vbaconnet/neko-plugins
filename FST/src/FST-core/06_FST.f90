@@ -687,8 +687,6 @@ contains
     call MPI_Bcast(this%n_modes, 1, MPI_INTEGER, 0, NEKO_COMM, ierr)
     call MPI_Bcast(this%n_shells, 1, MPI_INTEGER, 0, NEKO_COMM, ierr)
 
-    call MPI_Barrier(NEKO_COMM, ierr)
-
     !
     ! Allocate all the relevant arrays:
     ! shell,  kx, ky, kz, amplitudes, u_hat_pn, v_hat_pn, w_hat_pn
@@ -717,7 +715,6 @@ contains
        ! Read the file line by line
        do i = 1, this%n_modes
 
-          idx_shell = (i-1)/this%n_eff_pts_per_shell + 1
           read(unit,*) this%shell(i), this%k_x(i), &
                this%k_y(i), this%k_z(i), &
                this%shell_amp( this%shell(i) ), &
@@ -741,22 +738,24 @@ contains
 
     end if ! pe_rank .eq. 0
 
-    call MPI_Bcast(this%k_x, this%n_modes, MPI_EXTRA_PRECISION, 0, &
-         NEKO_COMM, ierr)
-    call MPI_Bcast(this%k_y, this%n_modes, MPI_EXTRA_PRECISION, 0, &
-         NEKO_COMM, ierr)
-    call MPI_Bcast(this%k_z, this%n_modes, MPI_EXTRA_PRECISION, 0, &
-         NEKO_COMM, ierr)
-    call MPI_Bcast(this%shell, this%n_modes, MPI_INTEGER, 0, NEKO_COMM, &
-         ierr)
-    call MPI_Bcast(this%shell_amp, this%n_shells, MPI_EXTRA_PRECISION, 0, &
-         NEKO_COMM, ierr)
+    call MPI_Bcast(this%k_x, this%n_modes, &
+            MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr)
+    call MPI_Bcast(this%k_y, this%n_modes, &
+            MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr)
+    call MPI_Bcast(this%k_z, this%n_modes, &
+            MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr)
+    
+    call MPI_Bcast(this%shell, this%n_modes, &
+            MPI_INTEGER, 0, NEKO_COMM, ierr)
+    call MPI_Bcast(this%shell_amp, this%n_shells, &
+            MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr)
+    
     call MPI_Bcast(this%random_vectors, this%n_modes*3, &
          MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr)
-    call MPI_Bcast(this%phase_shifts, this%n_modes, MPI_EXTRA_PRECISION, &
-         0, NEKO_COMM, ierr)
-    call MPI_Barrier(NEKO_COMM, ierr)
-
+    
+    call MPI_Bcast(this%phase_shifts, this%n_modes, &
+            MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr)
+    
     call neko_log%end_section('')
 
   end subroutine FST_read_from_files
