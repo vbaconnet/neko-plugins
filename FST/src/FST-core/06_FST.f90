@@ -9,23 +9,24 @@ module FST
   use, intrinsic :: iso_c_binding, only : c_ptr, C_NULL_PTR
   !use global_params
   use fst_operator, only: fst_bc_compute
-  use turbu, only : make_turbu
-  use fst_utils, only : print_param
+  use turbu, only : make_turbu, write_bb, write_fst_spectrum
+  use fst_utils, only : print_param, pi
   use logger, only: LOG_SIZE, neko_log
   use field, only: field_t
   use coefs, only: coef_t
-  use num_types, only: rp
+  use num_types, only: rp, dp, xp
   use utils, only: neko_error
   use point_zone, only: point_zone_t
   use comm, only: pe_rank
-  use math, only: masked_gather_copy_0, pi, glmin, glmax
+  use math, only: masked_gather_copy_0, glmin, glmax
   use device_math, only: device_masked_gather_copy_0
   use device, only: device_map, device_memcpy, HOST_TO_DEVICE, device_unmap
   use mpi_f08, only: MPI_IN_PLACE, MPI_MAX, MPI_MIN, MPI_INTEGER, MPI_Bcast, &
-      MPI_Allreduce
-  use comm, only: MPI_REAL_PRECISION, NEKO_COMM
+      MPI_Allreduce, MPI_LOGICAL
+  use comm, only: MPI_REAL_PRECISION, MPI_EXTRA_PRECISION, NEKO_COMM
   use device, only: device_get_ptr
   use neko_config, only: NEKO_BCKND_DEVICE
+  use runtime_stats, only: neko_rt_stats
   implicit none
 
 
@@ -35,35 +36,35 @@ module FST
      integer :: seed = -143
 
      ! periodic directions
-     logical :: periodic_x
-     real(kind=rp) :: Lx
-     logical :: periodic_y
-     real(kind=rp) :: Ly
-     logical :: periodic_z
-     real(kind=rp) :: Lz
+     logical :: periodic_x = .false.
+     real(kind=xp) :: Lx = -99.0_xp
+     logical :: periodic_y = .false.
+     real(kind=xp) :: Ly = -99.0_xp
+     logical :: periodic_z = .false.
+     real(kind=xp) :: Lz = -99.0_xp
 
      ! x fringe
-     real(kind=rp) :: xmin
-     real(kind=rp) :: xmax
-     real(kind=rp) :: xstart
-     real(kind=rp) :: xend
-     real(kind=rp) :: x_delta_rise
-     real(kind=rp) :: x_delta_fall
+     real(kind=xp) :: xmin
+     real(kind=xp) :: xmax
+     real(kind=xp) :: xstart
+     real(kind=xp) :: xend
+     real(kind=xp) :: x_delta_rise
+     real(kind=xp) :: x_delta_fall
 
      ! y fringe
-     real(kind=rp) :: ymin
-     real(kind=rp) :: ymax
-     real(kind=rp) :: ystart
-     real(kind=rp) :: yend
-     real(kind=rp) :: y_delta_rise
-     real(kind=rp) :: y_delta_fall
+     real(kind=xp) :: ymin
+     real(kind=xp) :: ymax
+     real(kind=xp) :: ystart
+     real(kind=xp) :: yend
+     real(kind=xp) :: y_delta_rise
+     real(kind=xp) :: y_delta_fall
 
      !> Total fringe amplitude
-     real(kind=rp) :: fringe_max
+     real(kind=xp) :: fringe_max
 
      !> Final ramp time
-     real(kind=rp) :: t_end
-     real(kind=rp) :: t_start
+     real(kind=dp) :: t_end
+     real(kind=dp) :: t_start
 
      logical :: is_forcing
      logical :: is_bc
@@ -71,44 +72,44 @@ module FST
      ! ------- 
      ! FST generation parameters
      !> Free-stream velocity
-     real(kind=rp) :: Uinf
+     real(kind=xp) :: Uinf = -99.0_xp
      !> Turbulence intensity
-     real(kind=rp) :: Tu
+     real(kind=xp) :: Tu = -99.0_xp
      !> Turbulent length scale
-     real(kind=rp) :: L
+     real(kind=xp) :: L = -99.0_xp
      !> Number of shells
-     integer :: n_shells
+     integer :: n_shells = -1
      !> Max number of points per shell
-     integer :: n_max_pts_per_shell
+     integer :: n_max_pts_per_shell = -1
      !> Start and end bounds of the total wavenumber range
-     real(kind=rp) :: k_start, k_end
+     real(kind=xp) :: k_start = -99.0_xp, k_end = -99.0_xp
      !> Effective number of points per shell, usually equal to but sometimes 
      !! lower than n_max_pts_per_shell
-     integer :: n_eff_pts_per_shell = 0
+     integer :: n_eff_pts_per_shell = -1
      !> Total number of modes (2*n_shells*n_max_eff_per_shell)
-     integer :: n_modes = 0
+     integer :: n_modes = -1
      
      !> Random, divergence-free unit vectors
-     real(kind=rp), allocatable :: random_vectors(:,:) ! u_hat_pn but reshaped
+     real(kind=xp), allocatable :: random_vectors(:,:) ! u_hat_pn but reshaped
      type(c_ptr) :: random_vectors_d = C_NULL_PTR
      !> Map to the total wavenumber id/shell
      integer, allocatable :: shell(:)
      type(c_ptr) :: shell_d = C_NULL_PTR
      !> Amplitude of mode on a given shell
-     real(kind=rp), allocatable :: shell_amp(:)
+     real(kind=xp), allocatable :: shell_amp(:)
      type(c_ptr) :: shell_amp_d = C_NULL_PTR
 
      !> Wavenumbers in the x,y,z direction
-     real(kind=rp), allocatable :: k_x(:)
-     real(kind=rp), allocatable :: k_y(:)
-     real(kind=rp), allocatable :: k_z(:)
+     real(kind=xp), allocatable :: k_x(:)
+     real(kind=xp), allocatable :: k_y(:)
+     real(kind=xp), allocatable :: k_z(:)
      type(c_ptr) :: k_x_d = C_NULL_PTR
 
-     real(kind=rp), allocatable :: phase_shifts(:)
+     real(kind=xp), allocatable :: phase_shifts(:)
      ! -------
 
      !> Fringe in space
-     real(kind=rp), allocatable :: fringe_space(:)
+     real(kind=xp), allocatable :: fringe_space(:)
      type(c_ptr) :: fringe_space_d = C_NULL_PTR
 
      !> Baseflows, if applying on a non-uniform inflow
@@ -120,14 +121,19 @@ module FST
      type(c_ptr) :: w_baseflow_d = C_NULL_PTR
 
      !> Variable that is precomputed to save some time
-     real(kind=rp), allocatable :: phi_0(:,:)
+     real(kind=xp), allocatable :: phi_0(:,:)
      type(c_ptr) :: phi_0_d = C_NULL_PTR
 
    contains
 
      ! ======== Init/Free procedures
-     procedure, pass(this) :: init_common => FST_init_common
-     procedure, pass(this) :: init_bc => FST_init_bc
+     procedure, pass(this) :: init_common_params => FST_init_common_params
+     procedure, pass(this) :: init_common_fringe => FST_init_common_fringe
+     generic :: init_bc => init_bc_params, init_bc_from_files
+
+     procedure, pass(this) :: init_bc_params => FST_init_bc_params
+     procedure, pass(this) :: init_bc_from_files => FST_init_bc_from_files
+     procedure, pass(this) :: read_from_files => FST_read_from_files
      !procedure, pass(this) :: init_forcing => FST_init_forcing
      procedure, pass(this) :: unmap => FST_unmap
      procedure, pass(this) :: free => FST_free
@@ -144,6 +150,7 @@ module FST
      !   procedure, pass(this) :: apply_forcing => FST_forcing_zone
      procedure, pass(this) :: apply_BC => FST_apply_BC
      ! ========================================================================
+     procedure, pass(this) :: write_config => FST_write_config
      procedure, pass(this) :: validate => FST_validate
      procedure, pass(this) :: print => FST_print_params
   end type FST_t
@@ -151,30 +158,18 @@ module FST
 contains
 
   !> Initialize all parameters
-  subroutine FST_init_common(this, &
+  !! ATTENTION: Must be called first when used in other inits!
+  subroutine FST_init_common_params(this, &
        Uinf, Tu, L, k_start, k_end, Nshells, Npmax, &
        periodic_x, periodic_y, periodic_z, &
-       xmin, xmax, xstart, xend, x_delta_rise, x_delta_fall, &
-       ymin, ymax, ystart, yend, y_delta_rise, y_delta_fall, &
-       fringe_max, &
-       t_start, t_ramp, &
        seed)
     class(FST_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: Uinf, Tu, L, k_start, k_end
+    real(kind=xp), intent(in) :: Uinf, Tu, L, k_start, k_end
     integer, intent(in) :: Nshells, Npmax
-    real(kind=rp), intent(in) :: xmin, xmax, xstart, xend
-    real(kind=rp), intent(in) :: ymin, ymax, ystart, yend
-    real(kind=rp), intent(in) :: x_delta_rise, x_delta_fall
-    real(kind=rp), intent(in) :: y_delta_rise, y_delta_fall
-    real(kind=rp), intent(in) :: fringe_max
-    real(kind=rp), intent(in) :: t_start
-    real(kind=rp), intent(in) :: t_ramp
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
     integer, intent(inout), optional :: seed
 
     integer :: seed_ = -143
-
-    call this%free()
 
     if (present(seed)) seed_ = seed
     this%seed = seed_
@@ -194,6 +189,24 @@ contains
     this%periodic_y = periodic_y
     this%periodic_z = periodic_z
 
+  end subroutine FST_init_common_params
+
+  !> Initialize all parameters
+  !! ATTENTION: Must be called first when used in other inits!
+  subroutine FST_init_common_fringe(this, &
+       xmin, xmax, xstart, xend, x_delta_rise, x_delta_fall, &
+       ymin, ymax, ystart, yend, y_delta_rise, y_delta_fall, &
+       fringe_max, &
+       t_start, t_ramp)
+    class(FST_t), intent(inout) :: this
+    real(kind=xp), intent(in) :: xmin, xmax, xstart, xend
+    real(kind=xp), intent(in) :: ymin, ymax, ystart, yend
+    real(kind=xp), intent(in) :: x_delta_rise, x_delta_fall
+    real(kind=xp), intent(in) :: y_delta_rise, y_delta_fall
+    real(kind=xp), intent(in) :: fringe_max
+    real(kind=dp), intent(in) :: t_start
+    real(kind=dp), intent(in) :: t_ramp
+
     this%xstart = xstart
     this%xend = xend
     this%ystart = ystart
@@ -211,11 +224,11 @@ contains
     this%y_delta_fall = y_delta_fall!0.002
     this%t_start = t_start
     this%t_end = t_ramp
-    if (t_start .lt. 0.0_rp .or. t_ramp .lt. 0.0_rp .or. t_ramp .lt. t_start) then
+    if (t_start .lt. 0.0_xp .or. t_ramp .lt. 0.0_xp .or. t_ramp .lt. t_start) then
       call neko_error("t_start or t_ramp is invalid!")
     end if
 
-  end subroutine FST_init_common
+  end subroutine FST_init_common_fringe
 
 
   !> Initialize the FST to use with forcing.
@@ -254,8 +267,58 @@ contains
 
 !   end subroutine FST_init_forcing
 
+  subroutine FST_init_bc_from_files(this, &
+       read_path, &
+       px, py, pz, &
+       xmin, xmax, xstart, xend, x_delta_rise, x_delta_fall, &
+       ymin, ymax, ystart, yend, y_delta_rise, y_delta_fall, &
+       t_start, t_end, Uinf)
+    class(FST_t), intent(inout) :: this
+    character(len=*), intent(in) :: read_path
+    logical, intent(in) :: px, py, pz
+    real(kind=xp), intent(in) :: xmin, xmax, xstart, xend
+    real(kind=xp), intent(in) :: ymin, ymax, ystart, yend
+    real(kind=xp), intent(in) :: x_delta_rise, x_delta_fall
+    real(kind=xp), intent(in) :: y_delta_rise, y_delta_fall
+    real(kind=dp), intent(in) :: t_start
+    real(kind=dp), intent(in) :: t_end
+    real(kind=xp), intent(in), optional :: Uinf
+
+    logical :: found_fst_config
+
+    call neko_log%section('Initializing FST')
+
+    call this%read_from_files(read_path, found_fst_config)
+
+    if (.not. found_fst_config) then
+        if (.not. present(Uinf)) then
+           call neko_error("Uinf must be provided in the case file!")
+        else
+           this%Uinf = Uinf
+        end if
+    end if
+   
+    if (this%periodic_x .neqv. px) call neko_error("Unmatching periodicity in x")
+    if (this%periodic_y .neqv. py) call neko_error("Unmatching periodicity in y")
+    if (this%periodic_z .neqv. pz) call neko_error("Unmatching periodicity in z")
+
+    this%periodic_x = px
+    this%periodic_y = py
+    this%periodic_z = pz
+
+    call this%init_common_fringe(xmin, xmax, xstart, xend, x_delta_rise, x_delta_fall, &
+       ymin, ymax, ystart, yend, y_delta_rise, y_delta_fall, &
+       1.0_xp, &
+       t_start, t_end)
+
+    call this%print() ! show parameters
+
+    call neko_log%end_section()
+
+  end subroutine FST_init_bc_from_files
+
   !> Initialize the FST to use as a boundary condition
-  subroutine FST_init_bc(this, &
+  subroutine FST_init_bc_params(this, &
        Uinf, Tu, L, k_start, k_end, Nshells, Npmax, &
        periodic_x, periodic_y, periodic_z, &
        xmin, xmax, xstart, xend, x_delta_rise, x_delta_fall, &
@@ -264,26 +327,26 @@ contains
        seed)
 
     class(FST_t), intent(inout) :: this
-    real(kind=rp), intent(in) :: Uinf, Tu, L, k_start, k_end
+    real(kind=xp), intent(in) :: Uinf, Tu, L, k_start, k_end
     integer, intent(in) :: Nshells, Npmax
-    real(kind=rp), intent(in) :: xmin, xmax, xstart, xend
-    real(kind=rp), intent(in) :: ymin, ymax, ystart, yend
-    real(kind=rp), intent(in) :: x_delta_rise, x_delta_fall
-    real(kind=rp), intent(in) :: y_delta_rise, y_delta_fall
-    real(kind=rp), intent(in) :: t_start
-    real(kind=rp), intent(in) :: t_end
+    real(kind=xp), intent(in) :: xmin, xmax, xstart, xend
+    real(kind=xp), intent(in) :: ymin, ymax, ystart, yend
+    real(kind=xp), intent(in) :: x_delta_rise, x_delta_fall
+    real(kind=xp), intent(in) :: y_delta_rise, y_delta_fall
+    real(kind=dp), intent(in) :: t_start
+    real(kind=dp), intent(in) :: t_end
     logical, intent(in) :: periodic_x, periodic_y, periodic_z
     integer, intent(inout), optional :: seed
 
     call neko_log%section('Initializing FST')
 
-    call this%init_common(Uinf, Tu, L, k_start, k_end, Nshells, Npmax, &
-       periodic_x, periodic_y, periodic_z, &
-       xmin, xmax, xstart, xend, x_delta_rise, x_delta_fall, &
+    call this%init_common_params(Uinf, Tu, L, k_start, k_end, Nshells, Npmax, &
+       periodic_x, periodic_y, periodic_z, seed)
+
+    call this%init_common_fringe(xmin, xmax, xstart, xend, x_delta_rise, x_delta_fall, &
        ymin, ymax, ystart, yend, y_delta_rise, y_delta_fall, &
-       1.0_rp, &
-       t_start, t_end, &
-       seed)
+       1.0_xp, &
+       t_start, t_end)
 
     call this%print() ! show parameters
 
@@ -292,7 +355,7 @@ contains
     this%is_forcing = .false.
     this%is_bc = .true.
 
-  end subroutine FST_init_bc
+  end subroutine FST_init_bc_params
 
   !> Unmap device arrays
   subroutine FST_unmap(this)
@@ -357,7 +420,7 @@ contains
       call print_param("x_delta_rise   ", this%x_delta_rise)
       call print_param("x_delta_fall   ", this%x_delta_fall)
     else
-      call neko_log%message("(periodic in y, no fringe required)")
+      call neko_log%message("(periodic in z, no fringe required)")
     end if
 
     if (.not. this%periodic_y) then
@@ -368,7 +431,7 @@ contains
       call print_param("y_delta_rise   ", this%y_delta_rise)
       call print_param("y_delta_fall   ", this%y_delta_fall)
     else
-      call neko_log%message("(periodic in z, no fringe required)")
+      call neko_log%message("(periodic in y, no fringe required)")
     end if
    
     call print_param("Fringe amplitude ", this%fringe_max, fmt='F3.1')
@@ -464,7 +527,7 @@ contains
     integer, intent(in) :: gdim
     real(kind=rp), intent(in), optional :: Lx, Ly, Lz
 
-    integer :: ierr
+    integer :: ierr, start_seed
 
     call neko_log%section ('Generating FST')
 
@@ -479,14 +542,251 @@ contains
     
     call neko_log%end_section('')
 
-    call this%validate()
-
   end subroutine FST_generate_common
+
+  !> Initialize all the stuff from files generated by the FST code:
+  !! - fst.config (optional but strongly recommended)
+  !! - fst_spectrum.csv
+  !! - sphere.dat
+  !! - bb.txt
+  !!
+  !! NOTE: The structure of fst_spectrum.csv should be:
+  !!  shellno, kx, ky, kz, amp, u_hat_pn(1), u_hat_pn(2), u_hat_pn(3)
+  subroutine FST_read_from_files(this, path, found_fst_config)
+    class(FST_t), intent(inout) :: this
+    character(len=*), intent(in) :: path
+    logical, intent(out) :: found_fst_config
+
+    integer :: unit, ios, num_columns, num_lines, n_modes_total, i, np_eff, &
+         ierr, prev_shell, idx_shell_amp
+    character(len=1) :: delimiter
+    character(len=1024) :: line
+    character(len=2048) :: fpath
+    character(len=20) :: keyword
+    real(kind=xp) :: tmp
+    character(len=LOG_SIZE) :: log_buf
+
+    integer :: idx_shell
+
+    call neko_log%section('Reading FST from file')
+
+    delimiter = ','
+
+    if (pe_rank .eq. 0) then
+
+       !
+       ! Read fst.config to get number of spheres, max number of points per
+       ! shell and effective number of points per shell, and k_start/k_end
+       !
+       fpath = trim(path) // "/fst.config"
+       inquire(file=trim(fpath), exist=found_fst_config)
+
+       if (found_fst_config) then
+
+          call neko_log%message("Reading " // trim(fpath))
+          open(file = trim(fpath), unit = unit, status = "old", &
+                action="read", iostat=ios)
+
+          if (ios /= 0) then
+              call neko_error("Error opening " // trim(fpath))
+          end if
+
+          read(unit,*) keyword, this%Uinf
+          read(unit,*) keyword, this%Tu
+          read(unit,*) keyword, this%L
+          read(unit,*) keyword, this%k_start
+          read(unit,*) keyword, this%k_end
+          read(unit,*) keyword, this%n_shells
+          read(unit,*) keyword, this%n_max_pts_per_shell
+          read(unit,*) keyword, this%n_eff_pts_per_shell
+          read(unit,*) keyword, this%n_modes
+          read(unit,*) keyword, this%periodic_x
+          read(unit,*) keyword, this%periodic_y
+          read(unit,*) keyword, this%periodic_z
+          read(unit,*) keyword, this%seed
+
+          close(unit)
+
+       else ! If we don't have fst.config, make guesses from other files
+
+        call neko_log%warning("fst.config not found. Uinf must be given in case file!")
+
+        !
+        ! Read sphere.dat to get number of spheres, max number of points per
+        ! shell and effective number of points per shell, and k_start/k_end
+        !
+        fpath = trim(path) // "/sphere.dat"
+        call neko_log%message("Reading " // trim(fpath))
+        open(file = trim(fpath), unit = unit, status = "old", &
+              action="read", iostat=ios)
+
+        if (ios /= 0) then
+            call neko_error("Error opening " // trim(fpath))
+        end if
+
+        read(unit,*) line
+        read(unit,*) keyword, this%n_shells
+        read(unit,*) keyword, this%k_start
+        read(unit,*) keyword, this%k_end
+        read(unit,*) keyword, this%n_max_pts_per_shell
+        close(unit)
+
+       end if
+
+       !
+       ! Read FST spectrum, count # of lines to allocate all the arrays
+       !
+       fpath = trim(path) // "/fst_spectrum.csv"
+       open(file=trim(fpath), unit=unit, status="old", action="read", &
+            iostat=ios)
+       call neko_log%message("Reading " // trim(fpath))
+       if (ios /= 0) then
+          call neko_error("Error opening " // trim(fpath))
+       end if
+
+       num_columns = 1
+       num_lines = 0
+
+       ! Read the file line by line
+       do
+          read(unit, '(A)', iostat=ios) line
+          if (ios /= 0) exit
+
+          ! If it's the first line, count the columns
+          if (num_columns .eq. 1) then
+
+             ! Count the number of delimiters in the line
+             do i = 1, len_trim(line)
+                if (line(i:i) == delimiter) then
+                   num_columns = num_columns + 1
+                end if
+             end do
+
+          end if ! if num_columns .eq. 1
+
+          num_lines = num_lines + 1
+       end do
+       close(unit)
+
+       ! NOTE: this requirement on the number of columns is a bit hardcoded..
+       !        AND different from the original implementation. Hence the
+       !        extra verbose error message.
+       if (num_columns .ne. 8) then
+          call neko_log%message("***ERROR READING fst_spectrum.csv***")
+          call neko_log%message("fst_spectrum should have 8 cols.")
+          call neko_log%message("shell,kx,ky,kz,amp,u_hat_pn1,u_hat_pn2,u_hat_pn3")
+          call neko_error("fst_spectrum.csv should have 8 columns")
+       end if
+
+       ! NOTE: The total number of modes in the file can sometimes be
+       ! different from the theoretical value 2*N_shells*N_points_per_shell.
+       ! This is because some modes are removed in the process.
+       if (.not. found_fst_config) then
+         this%n_modes = num_lines - 1 ! Remove the header
+         this%n_eff_pts_per_shell = this%n_modes / this%n_shells
+       end if
+
+    end if ! pe_rank .eq. 0
+
+    call MPI_Bcast(this%n_modes, 1, MPI_INTEGER, 0, NEKO_COMM, ierr)
+    call MPI_Bcast(this%n_shells, 1, MPI_INTEGER, 0, NEKO_COMM, ierr)
+
+    call MPI_Bcast(found_fst_config, 1, MPI_LOGICAL, 0, NEKO_COMM, ierr)
+    
+    ! Broadcast variables to all ranks if fst.config was found.
+    ! Technically not all of those are needed on all ranks but it's more
+    ! for completeness than anything else.
+    if (found_fst_config) then
+      call MPI_Bcast(this%Uinf, 1, MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr) 
+      call MPI_Bcast(this%Tu, 1, MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr) 
+      call MPI_Bcast(this%L, 1, MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr) 
+      call MPI_Bcast(this%k_start, 1, MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr) 
+      call MPI_Bcast(this%k_end, 1, MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr) 
+      call MPI_Bcast(this%n_max_pts_per_shell, 1, MPI_INTEGER, 0, NEKO_COMM, ierr)
+      call MPI_Bcast(this%n_eff_pts_per_shell, 1, MPI_INTEGER, 0, NEKO_COMM, ierr)
+      call MPI_Bcast(this%periodic_x, 1, MPI_LOGICAL, 0, NEKO_COMM, ierr)
+      call MPI_Bcast(this%periodic_y, 1, MPI_LOGICAL, 0, NEKO_COMM, ierr)
+      call MPI_Bcast(this%periodic_z, 1, MPI_LOGICAL, 0, NEKO_COMM, ierr)
+      call MPI_Bcast(this%seed, 1, MPI_INTEGER, 0, NEKO_COMM, ierr)
+    end if
+
+    !
+    ! Allocate all the relevant arrays:
+    ! shell,  kx, ky, kz, amplitudes, u_hat_pn, v_hat_pn, w_hat_pn
+    !
+    allocate(this%shell(this%n_modes))
+    allocate(this%k_x(this%n_modes))
+    allocate(this%k_y(this%n_modes))
+    allocate(this%k_z(this%n_modes))
+    allocate(this%shell_amp(this%n_shells))
+    allocate(this%random_vectors(this%n_modes,3))
+    allocate(this%phase_shifts(this%n_modes))
+
+    if (pe_rank .eq. 0) then
+       
+       !
+       ! Now read fst_spectrum again and populate all the arrays
+       !
+       open(file=trim(fpath), unit=unit, status="old", action="read", &
+            iostat=ios)
+       if (ios /= 0) then
+          call neko_error("Error opening " // trim(fpath))
+       end if
+
+       read(unit,*) line! read the header
+
+       ! Read the file line by line
+       do i = 1, this%n_modes
+
+          read(unit,*) this%shell(i), this%k_x(i), &
+               this%k_y(i), this%k_z(i), &
+               this%shell_amp( this%shell(i) ), &
+               this%random_vectors(i,1), this%random_vectors(i,2), &
+               this%random_vectors(i,3)
+       end do
+       close(unit)
+
+       !
+       ! Read the phase shifts in bb.txt
+       !
+       fpath = trim(path) // "/bb.txt"
+       open(file=trim(fpath), unit=unit, status="old", action="read", iostat=ios)
+       if (ios /= 0) then
+          call neko_error("Error opening " // trim(fpath))
+       end if
+       
+       do i = 1, this%n_modes
+          read(unit,*) this%phase_shifts(i), tmp
+       end do
+
+    end if ! pe_rank .eq. 0
+
+    call MPI_Bcast(this%k_x, this%n_modes, &
+            MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr)
+    call MPI_Bcast(this%k_y, this%n_modes, &
+            MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr)
+    call MPI_Bcast(this%k_z, this%n_modes, &
+            MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr)
+    
+    call MPI_Bcast(this%shell, this%n_modes, &
+            MPI_INTEGER, 0, NEKO_COMM, ierr)
+    call MPI_Bcast(this%shell_amp, this%n_shells, &
+            MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr)
+    
+    call MPI_Bcast(this%random_vectors, this%n_modes*3, &
+         MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr)
+    
+    call MPI_Bcast(this%phase_shifts, this%n_modes, &
+            MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr)
+    
+    call neko_log%end_section('')
+
+  end subroutine FST_read_from_files
 
   subroutine FST_validate(this)
    class(FST_t), intent(in) :: this
 
-   real(kind=rp) :: kmin, kmax
+   real(kind=xp) :: kmin, kmax
    character(len=LOG_SIZE) :: log_buf
    integer :: ierr
 
@@ -498,20 +798,20 @@ contains
    call neko_log%section("Wavenumbers")
 
    ! x-direction
-   kmin = glmin(abs(this%k_x), this%n_modes)
-   kmax = glmax(abs(this%k_x), this%n_modes)
+   kmin = glmin(real( abs(this%k_x), kind=rp), this%n_modes)
+   kmax = glmax(real( abs(this%k_x), kind=rp), this%n_modes)
    call print_param("(x) min wavelength", 2.0_rp*pi/kmax, fmt='F10.4')
    call print_param("(x) max wavelength", 2.0_rp*pi/kmin, fmt='F10.4')
 
    ! y-direction
-   kmin = glmin(abs(this%k_y), this%n_modes)
-   kmax = glmax(abs(this%k_y), this%n_modes)
+   kmin = glmin(real( abs(this%k_y), kind=rp), this%n_modes)
+   kmax = glmax(real( abs(this%k_y), kind=rp), this%n_modes)
    call print_param("(y) min wavelength", 2.0_rp*pi/kmax, fmt='F10.4')
    call print_param("(y) max wavelength", 2.0_rp*pi/kmin, fmt='F10.4')
 
    ! z-direction
-   kmin = glmin(abs(this%k_z), this%n_modes)
-   kmax = glmax(abs(this%k_z), this%n_modes)
+   kmin = glmin(real( abs(this%k_z), kind=rp), this%n_modes)
+   kmax = glmax(real( abs(this%k_z), kind=rp), this%n_modes)
    call print_param("(z) min wavelength", 2.0_rp*pi/kmax, fmt='F10.4')
    call print_param("(z) max wavelength", 2.0_rp*pi/kmin, fmt='F10.4')
    call neko_log%end_section()
@@ -526,7 +826,11 @@ contains
 
    block
     integer :: shellno, i
-    real(kind=rp) :: amp, uamp, vamp, wamp, ue, ve, we
+    real(kind=xp) :: amp, uamp, vamp, wamp, ue, ve, we
+
+    ue = 0.0_xp
+    ve = 0.0_xp
+    we = 0.0_xp
 
     do i=1, this%n_modes
       shellno = this%shell(i)
@@ -536,16 +840,16 @@ contains
       vamp = this%random_vectors(i,2)*amp
       wamp = this%random_vectors(i,3)*amp
 
-      ue = ue + ((uamp)**2.0_rp)/2.0_rp
-      ve = ve + ((vamp)**2.0_rp)/2.0_rp
-      we = we + ((wamp)**2.0_rp)/2.0_rp
+      ue = ue + ((uamp)**2.0_xp)/2.0_xp
+      ve = ve + ((vamp)**2.0_xp)/2.0_xp
+      we = we + ((wamp)**2.0_xp)/2.0_xp
     enddo
 
     call print_param('Energy in u  ', ue, fmt='E12.6')
     call print_param('Energy in v  ', ve, fmt='E12.6')
     call print_param('Energy in w  ', we, fmt='E12.6')
     call print_param('Target TKE   ', 1.5_rp * this%Uinf**2 * this%Tu**2, fmt='E12.6')
-    call print_param('Estimated TKE', (ue+ve+we)/2.0_rp, fmt='E12.6')
+    call print_param('Estimated TKE', (ue+ve+we)/2.0_xp, fmt='E12.6')
     call print_param('Target Tu    ', this%Tu, fmt='E12.6')
     call print_param('Estimated Tu ', sqrt((ue+ve+we)/3.0_rp / this%Uinf), fmt='E12.6')
 
@@ -602,7 +906,7 @@ contains
 
   !> Do the generation for BC.
   subroutine FST_generate_bc(this, x_dof, y_dof, z_dof, bc_mask, n, u, v, w, &
-      path, gdim)
+      path, gdim, read_from_files)
     class(FST_t), intent(inout) :: this
     real(kind=rp), intent(in) :: x_dof(:,:,:,:), y_dof(:,:,:,:), z_dof(:,:,:,:)
     integer, intent(in) :: bc_mask(0:n)
@@ -610,9 +914,16 @@ contains
     type(field_t), intent(in) :: u, v, w
     character(len=*), intent(in) :: path
     integer, intent(in) :: gdim
+    logical, intent(in) :: read_from_files
 
-    real(kind=rp) :: x, y, z, ymin, ymax, zmin, zmax, Ly, Lz
-    integer :: ierr, i, idx, m, j
+    real(kind=rp) :: x, y, z, ymin, ymax, zmin, zmax
+    real(kind=rp) :: Ly, Lz
+    integer :: ierr, start_seed, i, idx, m, j
+
+
+    ! Keep the initial seed value since the value will be modified every time
+    ! ran2 is called
+    start_seed = this%seed
 
     !
     ! Compute the spatial bounds in the mask
@@ -669,7 +980,17 @@ contains
     !
     ! Do the common generation (not passing Lx since it is not supported yet)
     !
-    call this%generate_common(path, gdim, Ly = Ly, Lz = Lz)
+    if (.not. read_from_files) then
+      call this%generate_common(path, gdim, Ly = Ly, Lz = Lz)
+    else
+      call write_bb(path, this%phase_shifts)
+      call write_fst_spectrum(path, this%shell, this%k_x, this%k_y, this%k_z, &
+             this%shell_amp, this%random_vectors) 
+    end if
+    
+    call this%write_config(path, start_seed)
+
+    call this%validate()
 
     !
     ! Apply baseflow in the bc zone
@@ -738,6 +1059,41 @@ contains
     end if
 
   end subroutine FST_generate_bc
+
+  subroutine FST_write_config(this, path, start_seed)
+    class(FST_t), intent(in) :: this
+    character(len=*), intent(in) :: path
+    integer, intent(in) :: start_seed
+
+    integer :: newunit, ierrf
+    if (pe_rank .eq. 0) then
+
+        open(file=trim(path)//"/fst.config", newunit=newunit, &
+              status="replace", action="write", iostat=ierrf)
+
+        if (ierrf /= 0) then
+          call neko_error("Error writing " // trim(path) // "/fst.config")
+        end if
+
+        call neko_log%message("Writing " // trim(path) // "/fst.config")
+        write(newunit,'(A," ",g0)') "Uinf", this%Uinf
+        write(newunit,'(A," ",g0)') "Tu", this%Tu
+        write(newunit,'(A," ",g0)') "L", this%L
+        write(newunit,'(A," ",g0)') "k_start", this%k_start
+        write(newunit,'(A," ",g0)') "k_end", this%k_end
+        write(newunit,'(A," ",I0)') "n_shells", this%n_shells
+        write(newunit,'(A," ",I0)') "n_max_pts_per_shell", this%n_max_pts_per_shell
+        write(newunit,'(A," ",I0)') "n_eff_pts_per_shell", this%n_eff_pts_per_shell
+        write(newunit,'(A," ",I0)') "n_modes", this%n_modes
+        write(newunit,'(A," ",L1)') "periodic_x", this%periodic_x
+        write(newunit,'(A," ",L1)') "periodic_y", this%periodic_y
+        write(newunit,'(A," ",L1)') "periodic_z", this%periodic_z
+        write(newunit,'(A," ",I0)') "seed", start_seed
+        close(newunit)
+        
+    end if
+
+  end subroutine FST_write_config
 
   ! Forcing to be performed on entire domain, on a local element ix
   ! Final values of the forcing are to be applied
@@ -812,19 +1168,23 @@ contains
     integer, intent(in) :: n ! size of the bc mask
     integer, intent(in) :: bc_mask(0:n)
     real(kind=rp), intent(in), dimension(:,:,:,:) :: x, y, z
-    real(kind=rp), intent(in) :: t
+    real(kind=dp), intent(in) :: t
     real(kind=rp), intent(inout), dimension(:,:,:,:) :: u_bc, v_bc, w_bc
-    real(kind=rp), intent(in) :: angleXY
+    real(kind=xp), intent(in) :: angleXY
     logical, intent(in) :: on_host
 
-    real(kind=rp) :: fringe_time
+    real(kind=xp) :: fringe_time
+    integer :: rt_id
 
     fringe_time = time_ramp(t, this%t_end, this%t_start)
 
+    call neko_rt_stats%find_region_id("FST compute", rt_id)
+    call neko_rt_stats%start_region("FST compute", rt_id)
     call fst_bc_compute(t, this%Uinf, u_bc, v_bc, w_bc, bc_mask, n, &
          this%u_baseflow, this%v_baseflow, this%w_baseflow, &
          this%k_x, this%n_modes, this%phi_0, this%shell, this%shell_amp, &
          this%random_vectors, angleXY, fringe_time, this%fringe_space, on_host)
+    call neko_rt_stats%end_region("FST compute", rt_id)
 
 !!$    phi_t = glb_uinf*t
 !!$    ! Loop on all points in the point zone
@@ -899,18 +1259,18 @@ contains
   !
   ! Linear ramp in time
   function time_ramp(t, t_end, t_start) result(ramp)
-    real(kind=rp), intent(in) :: t
-    real(kind=rp), intent(in) :: t_end
-    real(kind=rp), intent(in) :: t_start
+    real(kind=dp), intent(in) :: t
+    real(kind=dp), intent(in) :: t_end
+    real(kind=dp), intent(in) :: t_start
 
-    real(kind=rp) :: ramp
+    real(kind=dp) :: ramp
 
     if (t .le. t_start) then
-       ramp = 0.0_rp
+       ramp = 0.0_dp
     else if (t .lt. t_end) then
        ramp = (t - t_start)/(t_end - t_start)
     else
-       ramp = 1.0_rp
+       ramp = 1.0_dp
     end if
 
   end function time_ramp
@@ -936,7 +1296,7 @@ contains
     real(kind=rp), intent(in) :: x
     real(kind=rp), intent(in), optional :: y
     type(FST_t), intent(in) :: f
-    real(kind=rp) :: fr
+    real(kind=xp) :: fr
     integer :: i
     character :: a
 
@@ -950,8 +1310,8 @@ contains
 
   ! Smooth step function, 0 if x <= 0, 1 if x >= 1, 1/erp(1/(x-1) + 1/x) between 0 and 1
   function S(x) result(y)
-    real(kind=rp), intent(in) :: x
-    real(kind=rp) :: y
+    real(kind=xp), intent(in) :: x
+    real(kind=xp) :: y
 
     if ( x.le.0._rp ) then
        y = 0._rp

@@ -86,7 +86,7 @@ contains
          ! Apply FST
          !
          coef => neko_user_access%case%fluid%c_Xh
-         call fst_bc_driver_apply(u, v, w, bc, coef, time%t, time%tstep, 0.0_rp, .false.)
+         call fst_bc_driver_apply(u, v, w, bc, coef, time%t, time%tstep, 0.0_xp, .false.)
        end associate
 
     !

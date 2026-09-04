@@ -1,10 +1,8 @@
 module sphere
-  use num_types, only : rp
-  use math, only : pi
+  use num_types, only : xp
   use utils, only : neko_error
-  use fst_utils, only : print_param
+  use fst_utils, only : print_param, pi
   use logger, only : LOG_SIZE, neko_log
-  !use global_params
   implicit none
 
 contains
@@ -24,18 +22,18 @@ contains
   subroutine compute_sphere(Np,x,y,z,rad,rotx,roty,rotz,file)
 
     integer, intent(inout) :: Np
-    real(kind=rp), intent(inout) :: x(Np), y(Np), z(Np)
-    real(kind=rp), intent(in) :: rotx, roty, rotz, rad
+    real(kind=xp), intent(inout) :: x(Np), y(Np), z(Np)
+    real(kind=xp), intent(in) :: rotx, roty, rotz, rad
     logical, intent(in) :: file
 
     integer :: i, j, k, Nn, kk
-    real(kind=rp) :: dphi, dtheta ,theta ,phi
+    real(kind=xp) :: dphi, dtheta ,theta ,phi
     integer :: Nphi,num ,Npn
 
-    real(kind=rp) :: theta1, Nphir
+    real(kind=xp) :: theta1, Nphir
     logical new
 
-    real(kind=rp) :: w,d
+    real(kind=xp) :: w,d
     integer :: N,Nl,Npp,Npn1
     integer :: l(1000,2)
     character(len=LOG_SIZE) :: log_buf
@@ -54,19 +52,19 @@ contains
          call neko_error("Max number of points hardcoded to 1000 (sphere.f90)")
 
     if (Np.le.2) then
-       call asp(x, y, z, 1, 0._rp, 0._rp, 0._rp)
+       call asp(x, y, z, 1, 0._xp, 0._xp, 0._xp)
        Nl=0
        Np=1
     else if (Np.eq.4) then
        !let's have a tetraeder
        Np=4
-       call asp(x,y,z,1,-1._rp/6._rp*sqrt(3._rp),-0.5_rp,0._rp)
-       call asp(x,y,z,2,-1._rp/6._rp*sqrt(3._rp),0.5_rp,0._rp)
-       call asp(x,y,z,3,1._rp/3._rp*sqrt(3._rp),0._rp,0._rp)
-       call asp(x,y,z,4,0._rp,0._rp,1._rp/3._rp*sqrt(6._rp))
+       call asp(x,y,z,1,-1._xp/6._xp*sqrt(3._xp),-0.5_xp,0._xp)
+       call asp(x,y,z,2,-1._xp/6._xp*sqrt(3._xp),0.5_xp,0._xp)
+       call asp(x,y,z,3,1._xp/3._xp*sqrt(3._xp),0._xp,0._xp)
+       call asp(x,y,z,4,0._xp,0._xp,1._xp/3._xp*sqrt(6._xp))
 
-       call trans(x,y,z,Np,0._rp,0._rp,-sqrt(6._rp)/12._rp)
-       call scale1(x,y,z,Np,sqrt(6._rp)*2_rp/3._rp)
+       call trans(x,y,z,Np,0._xp,0._xp,-sqrt(6._xp)/12._xp)
+       call scale1(x,y,z,Np,sqrt(6._xp)*2_xp/3._xp)
 
        Nl=6
        call asl(l,1,1,2)
@@ -80,15 +78,15 @@ contains
        !let's have a octaeder
 
        Np=6
-       call asp(x,y,z,1,0._rp,0._rp,sqrt(2._rp)/2._rp)
-       call asp(x,y,z,2,0._rp,1._rp,sqrt(2._rp)/2._rp)
-       call asp(x,y,z,3,1._rp,1._rp,sqrt(2._rp)/2._rp)
-       call asp(x,y,z,4,1._rp,0._rp,sqrt(2._rp)/2._rp)
-       call asp(x,y,z,5,0.5_rp,0.5_rp,0._rp)
-       call asp(x,y,z,6,0.5_rp,0.5_rp,sqrt(2._rp))
+       call asp(x,y,z,1,0._xp,0._xp,sqrt(2._xp)/2._xp)
+       call asp(x,y,z,2,0._xp,1._xp,sqrt(2._xp)/2._xp)
+       call asp(x,y,z,3,1._xp,1._xp,sqrt(2._xp)/2._xp)
+       call asp(x,y,z,4,1._xp,0._xp,sqrt(2._xp)/2._xp)
+       call asp(x,y,z,5,0.5_xp,0.5_xp,0._xp)
+       call asp(x,y,z,6,0.5_xp,0.5_xp,sqrt(2._xp))
 
-       call trans(x,y,z,Np,-0.5_rp,-0.5_rp,-sqrt(2._rp)/2._rp)
-       call scale1(x,y,z,Np,sqrt(2._rp))
+       call trans(x,y,z,Np,-0.5_xp,-0.5_xp,-sqrt(2._xp)/2._xp)
+       call scale1(x,y,z,Np,sqrt(2._xp))
 
 
        Nl=12
@@ -108,14 +106,14 @@ contains
     else if (Np.eq.8) then
        !let's have a cube
        Np=8
-       call asp(x,y,z,1,-sqrt(3._rp)/3._rp,sqrt(3._rp)/3._rp,-sqrt(3._rp)/3._rp)
-       call asp(x,y,z,2,-sqrt(3._rp)/3._rp,-sqrt(3._rp)/3._rp,-sqrt(3._rp)/3._rp)
-       call asp(x,y,z,3,sqrt(3._rp)/3._rp,-sqrt(3._rp)/3._rp,-sqrt(3._rp)/3._rp)
-       call asp(x,y,z,4,sqrt(3._rp)/3._rp,sqrt(3._rp)/3._rp,-sqrt(3._rp)/3._rp)
-       call asp(x,y,z,5,-sqrt(3._rp)/3._rp,sqrt(3._rp)/3._rp,sqrt(3._rp)/3._rp)
-       call asp(x,y,z,6,-sqrt(3._rp)/3._rp,-sqrt(3._rp)/3._rp,sqrt(3._rp)/3._rp)
-       call asp(x,y,z,7,sqrt(3._rp)/3._rp,-sqrt(3._rp)/3._rp,sqrt(3._rp)/3._rp)
-       call asp(x,y,z,8,sqrt(3._rp)/3._rp,sqrt(3._rp)/3._rp,sqrt(3._rp)/3._rp)
+       call asp(x,y,z,1,-sqrt(3._xp)/3._xp,sqrt(3._xp)/3._xp,-sqrt(3._xp)/3._xp)
+       call asp(x,y,z,2,-sqrt(3._xp)/3._xp,-sqrt(3._xp)/3._xp,-sqrt(3._xp)/3._xp)
+       call asp(x,y,z,3,sqrt(3._xp)/3._xp,-sqrt(3._xp)/3._xp,-sqrt(3._xp)/3._xp)
+       call asp(x,y,z,4,sqrt(3._xp)/3._xp,sqrt(3._xp)/3._xp,-sqrt(3._xp)/3._xp)
+       call asp(x,y,z,5,-sqrt(3._xp)/3._xp,sqrt(3._xp)/3._xp,sqrt(3._xp)/3._xp)
+       call asp(x,y,z,6,-sqrt(3._xp)/3._xp,-sqrt(3._xp)/3._xp,sqrt(3._xp)/3._xp)
+       call asp(x,y,z,7,sqrt(3._xp)/3._xp,-sqrt(3._xp)/3._xp,sqrt(3._xp)/3._xp)
+       call asp(x,y,z,8,sqrt(3._xp)/3._xp,sqrt(3._xp)/3._xp,sqrt(3._xp)/3._xp)
 
        Nl=12
        call asl(l,1,1,2)
@@ -134,22 +132,22 @@ contains
     else if (Np.eq.12) then
        !     let's have an ikosaeder
        Np=12
-       w=0.5_rp*(sqrt(5._rp)+1._rp)
-       call asp(x,y,z,1,w/2._rp, 0._rp, 0.5_rp*(w-1))
-       call asp(x,y,z,2,w/2._rp, 0._rp, 0.5_rp*(w+1))
-       call asp(x,y,z,3,0._rp,0.5_rp*(w-1._rp),0.5_rp*w)
-       call asp(x,y,z,4,0._rp,0.5_rp*(w+1._rp),0.5_rp*w)
-       call asp(x,y,z,5,0.5_rp*w,w,0.5_rp*(w-1._rp))
-       call asp(x,y,z,6,0.5_rp*w,w,0.5_rp*(w+1._rp))
-       call asp(x,y,z,7,w,(w+1._rp)/2._rp,w/2._rp)
-       call asp(x,y,z,8,w,(w-1._rp)/2._rp,w/2._rp)
-       call asp(x,y,z,9,0.5_rp*(w+1._rp), 0.5_rp*w,w)
-       call asp(x,y,z,10,0.5_rp*(w-1),0.5_rp*w,w)
-       call asp(x,y,z,11,0.5_rp*(w+1),0.5_rp*w,0._rp)
-       call asp(x,y,z,12,0.5_rp*(w-1),0.5_rp*w,0._rp)
+       w=0.5_xp*(sqrt(5._xp)+1._xp)
+       call asp(x,y,z,1,w/2._xp, 0._xp, 0.5_xp*(w-1))
+       call asp(x,y,z,2,w/2._xp, 0._xp, 0.5_xp*(w+1))
+       call asp(x,y,z,3,0._xp,0.5_xp*(w-1._xp),0.5_xp*w)
+       call asp(x,y,z,4,0._xp,0.5_xp*(w+1._xp),0.5_xp*w)
+       call asp(x,y,z,5,0.5_xp*w,w,0.5_xp*(w-1._xp))
+       call asp(x,y,z,6,0.5_xp*w,w,0.5_xp*(w+1._xp))
+       call asp(x,y,z,7,w,(w+1._xp)/2._xp,w/2._xp)
+       call asp(x,y,z,8,w,(w-1._xp)/2._xp,w/2._xp)
+       call asp(x,y,z,9,0.5_xp*(w+1._xp), 0.5_xp*w,w)
+       call asp(x,y,z,10,0.5_xp*(w-1),0.5_xp*w,w)
+       call asp(x,y,z,11,0.5_xp*(w+1),0.5_xp*w,0._xp)
+       call asp(x,y,z,12,0.5_xp*(w-1),0.5_xp*w,0._xp)
 
-       call trans(x,y,z,Np,-0.5_rp*w,-0.5_rp*w,-0.5_rp*w)
-       call scale1(x,y,z,Np,2._rp/(sqrt(w**2._rp + 1._rp)))
+       call trans(x,y,z,Np,-0.5_xp*w,-0.5_xp*w,-0.5_xp*w)
+       call scale1(x,y,z,Np,2._xp/(sqrt(w**2._xp + 1._xp)))
 
 
 
@@ -188,31 +186,31 @@ contains
     else if (Np.eq.20) then
        !        let's have a dodekaeder
 
-       w=0.5_rp*(sqrt(5._rp)+3._rp)
+       w=0.5_xp*(sqrt(5._xp)+3._xp)
        Np=20
-       call asp(x, y, z, 1 , 0.5_rp*w        , 0.5_rp*(w-1._rp) , 0._rp)
-       call asp(x, y, z, 2 , 0.5_rp*w        , 0.5_rp*(w+1._rp) , 0._rp)
-       call asp(x, y, z, 3 , w-0.5_rp        , w-0.5_rp         , 0.5_rp)
-       call asp(x, y, z, 4 , w               , 0.5_rp*w         ,  0.5_rp*(w-1._rp))
-       call asp(x, y, z, 5 , w-0.5_rp        , 0.5_rp           ,  0.5_rp)
-       call asp(x, y, z, 6 , 0.5_rp*(w+1._rp), 0._rp            , 0.5_rp*w)
-       call asp(x, y, z, 7 , 0.5_rp*(w-1._rp), 0._rp            , 0.5_rp*w)
-       call asp(x, y, z, 8 , 0.5_rp          , 0.5_rp           , 0.5_rp)
-       call asp(x, y, z, 9 , 0._rp           , 0.5_rp*w         , (w-1._rp)*0.5_rp)
-       call asp(x, y, z, 10, 0.5_rp          , w-0.5_rp         , 0.5_rp)
-       call asp(x, y, z, 11, 0.5_rp*(w-1._rp), w                , 0.5_rp*w)
-       call asp(x, y, z, 12, 0.5_rp*(w+1._rp), w                , 0.5_rp*w)
-       call asp(x, y, z, 13, w-0.5_rp        , w-0.5_rp         , w-0.5_rp)
-       call asp(x, y, z, 14, w               , 0.5_rp*w         , 0.5_rp*(w+1._rp))
-       call asp(x, y, z, 15, w-0.5_rp        , 0.5_rp           , w-0.5_rp)
-       call asp(x, y, z, 16, 0.5_rp*w        , 0.5_rp*(w-1._rp) , w)
-       call asp(x, y, z, 17, 0.5_rp          , 0.5_rp           , w-0.5_rp)
-       call asp(x, y, z, 18, 0._rp           , 0.5_rp*w         , 0.5_rp*(w+1._rp))
-       call asp(x, y, z, 19, 0.5_rp          , w-0.5_rp         , w-0.5_rp)
-       call asp(x, y, z, 20, 0.5_rp*w        , 0.5_rp*(w+1._rp) , w)
+       call asp(x, y, z, 1 , 0.5_xp*w        , 0.5_xp*(w-1._xp) , 0._xp)
+       call asp(x, y, z, 2 , 0.5_xp*w        , 0.5_xp*(w+1._xp) , 0._xp)
+       call asp(x, y, z, 3 , w-0.5_xp        , w-0.5_xp         , 0.5_xp)
+       call asp(x, y, z, 4 , w               , 0.5_xp*w         ,  0.5_xp*(w-1._xp))
+       call asp(x, y, z, 5 , w-0.5_xp        , 0.5_xp           ,  0.5_xp)
+       call asp(x, y, z, 6 , 0.5_xp*(w+1._xp), 0._xp            , 0.5_xp*w)
+       call asp(x, y, z, 7 , 0.5_xp*(w-1._xp), 0._xp            , 0.5_xp*w)
+       call asp(x, y, z, 8 , 0.5_xp          , 0.5_xp           , 0.5_xp)
+       call asp(x, y, z, 9 , 0._xp           , 0.5_xp*w         , (w-1._xp)*0.5_xp)
+       call asp(x, y, z, 10, 0.5_xp          , w-0.5_xp         , 0.5_xp)
+       call asp(x, y, z, 11, 0.5_xp*(w-1._xp), w                , 0.5_xp*w)
+       call asp(x, y, z, 12, 0.5_xp*(w+1._xp), w                , 0.5_xp*w)
+       call asp(x, y, z, 13, w-0.5_xp        , w-0.5_xp         , w-0.5_xp)
+       call asp(x, y, z, 14, w               , 0.5_xp*w         , 0.5_xp*(w+1._xp))
+       call asp(x, y, z, 15, w-0.5_xp        , 0.5_xp           , w-0.5_xp)
+       call asp(x, y, z, 16, 0.5_xp*w        , 0.5_xp*(w-1._xp) , w)
+       call asp(x, y, z, 17, 0.5_xp          , 0.5_xp           , w-0.5_xp)
+       call asp(x, y, z, 18, 0._xp           , 0.5_xp*w         , 0.5_xp*(w+1._xp))
+       call asp(x, y, z, 19, 0.5_xp          , w-0.5_xp         , w-0.5_xp)
+       call asp(x, y, z, 20, 0.5_xp*w        , 0.5_xp*(w+1._xp) , w)
 
-       call trans(x, y, z, Np, -0.5_rp*w, -0.5_rp*w, -0.5_rp*w)
-       call scale1(x, y, z, Np, 2.0_rp/(sqrt(w**2.0_rp+1._rp)))
+       call trans(x, y, z, Np, -0.5_xp*w, -0.5_xp*w, -0.5_xp*w)
+       call scale1(x, y, z, Np, 2.0_xp/(sqrt(w**2.0_xp+1._xp)))
 
        Nl=30
        call asl(l,1,1,2)
@@ -253,28 +251,28 @@ contains
 
       !  Npp=Np
 
-      !  Nn=(1._rp+sqrt(-3.+2.*Npp))/2.
+      !  Nn=(1._xp+sqrt(-3.+2.*Npp))/2.
       !  Nn = Nn*2
-      !  Npn = real(Nn, kind=rp)**2./2.-real(Nn, kind=rp)+2.
+      !  Npn = real(Nn, kind=xp)**2./2.-real(Nn, kind=xp)+2.
       !  if (file) then
       !     if (Np.ne.Npn) then
       !        call neko_log%message('number of points is not exactly the same...')
-      !        call print_param('Np ', real(Np, kind=rp))
-      !        call print_param('Npn', real(Npn, kind=rp))
+      !        call print_param('Np ', real(Np, kind=xp))
+      !        call print_param('Npn', real(Npn, kind=xp))
       !     else
-      !        call print_param('Np', real(Np, kind=rp))
+      !        call print_param('Np', real(Np, kind=xp))
       !     end if
       !  end if
 
       !  Np=Npn
 
-      !  dphi= 2.0_rp*pi / real(Nn, kind=rp)
-      !  dtheta = 2.0_rp*pi / real(Nn, kind=rp)
+      !  dphi= 2.0_xp*pi / real(Nn, kind=xp)
+      !  dtheta = 2.0_xp*pi / real(Nn, kind=xp)
 
       !  k=1
       !  x(k)=0.
       !  y(k)=0.
-      !  z(k)=1._rp
+      !  z(k)=1._xp
       !  do j=1, Nn/2-1
       !     do i=1, (Nn)
       !        k=k+1
@@ -286,7 +284,7 @@ contains
       !  k=k+1
       !  x(k)=0.
       !  y(k)=0.
-      !  z(k)=-1._rp
+      !  z(k)=-1._xp
 
       !  k=0
       !  do i=2, Nn+1
@@ -321,17 +319,17 @@ contains
 
        Nn=1
 500    Npn=0
-       dtheta = 2.0_rp*pi / real(Nn, kind=rp)
+       dtheta = 2.0_xp*pi / real(Nn, kind=xp)
        do j=0, (Nn)/2
           theta=j*dtheta
-          if (sin(theta).eq.0.0_rp) then
-             dphi = 99999999.0_rp
+          if (sin(theta).eq.0.0_xp) then
+             dphi = 99999999.0_xp
           else
              dphi = dtheta / sin(theta)
           end if
-          Nphir = max(2.0_rp*pi / dphi ,1._rp)
-          Nphi = Nphir+0.5_rp
-          dphi = 2.0_rp*pi / real(Nphi, kind=rp)
+          Nphir = max(2.0_xp*pi / dphi ,1._xp)
+          Nphi = Nphir+0.5_xp
+          dphi = 2.0_xp*pi / real(Nphi, kind=xp)
           Npn=Npn+Nphi
        end do
        if (Npn.LE.Np) then
@@ -346,27 +344,27 @@ contains
           if (Np.ne.Npn) then
              write(log_buf, *) 'number of points is not exactly the same...'
              call neko_log%message(log_buf)
-             call print_param('Np ', real(Np, kind=rp))
-             call print_param('Npn', real(Npn, kind=rp))
+             call print_param('Np ', Np)
+             call print_param('Npn', Npn)
           else
-             call print_param('Np', real(Np, kind=rp))
+             call print_param('Np', Np)
           end if
        end if
 
 
-       dtheta = 2.0_rp*pi / real(Nn, kind=rp)
+       dtheta = 2.0_xp*pi / real(Nn, kind=xp)
        do j=0, (Nn)/2
           theta=j*dtheta
-          if (sin(theta).eq.0.0_rp) then
-             dphi = 99999999.0_rp
+          if (sin(theta).eq.0.0_xp) then
+             dphi = 99999999.0_xp
           else
              dphi = dtheta / sin(theta)
           end if
-          Nphir = max(2.0_rp*pi / dphi ,1._rp)
-          Nphi = Nphir+0.5_rp
-          dphi = 2.0_rp*pi / real(Nphi, kind=rp)
+          Nphir = max(2.0_xp*pi / dphi ,1._xp)
+          Nphi = Nphir+0.5_xp
+          dphi = 2.0_xp*pi / real(Nphi, kind=xp)
           do i=1, (Nphi)
-             phi=real(i, kind=rp)*dphi
+             phi=real(i, kind=xp)*dphi
              k=k+1
              x(k) = cos(phi)*sin(theta)
              y(k) = sin(phi)*sin(theta)
@@ -418,9 +416,9 @@ contains
   !! and zz respectively at a given index i.
   !! NOTE: This function seems kind of redundant, but oh well
   subroutine asp(x,y,z,i,xx,yy,zz)
-    real(kind=rp), intent(inout) :: x(1000),y(1000),z(1000)
+    real(kind=xp), intent(inout) :: x(1000),y(1000),z(1000)
     integer, intent(in) :: i
-    real(kind=rp), intent(in) :: xx,yy,zz
+    real(kind=xp), intent(in) :: xx,yy,zz
     x(i)=xx
     y(i)=yy
     z(i)=zz
@@ -439,8 +437,8 @@ contains
   subroutine trans(x,y,z,Np,xx,yy,zz)
     implicit none
     integer Np,i
-    real(kind=rp) :: xx,yy,zz
-    real(kind=rp) :: x(Np),y(Np),z(Np)
+    real(kind=xp) :: xx,yy,zz
+    real(kind=xp) :: x(Np),y(Np),z(Np)
     do i=1,Np
        x(i)=x(i)+xx
        y(i)=y(i)+yy
@@ -451,8 +449,8 @@ contains
   subroutine scale1(x,y,z,Np,r)
     implicit none
     integer Np,i
-    real(kind=rp) :: r
-    real(kind=rp) :: x(Np),y(Np),z(Np)
+    real(kind=xp) :: r
+    real(kind=xp) :: x(Np),y(Np),z(Np)
     do i=1,Np
        x(i)=x(i)*r
        y(i)=y(i)*r
@@ -463,10 +461,10 @@ contains
   subroutine rot3d(Np,x,y,z,rotx,roty,rotz)
     implicit none
     integer Np,i
-    real(kind=rp) :: rotx,roty,rotz
-    real(kind=rp) :: x(Np),y(Np),z(Np)
-    real(kind=rp) :: cx,cy,cz,sx,sy,sz
-    real(kind=rp) :: xx,yy,zz ,d
+    real(kind=xp) :: rotx,roty,rotz
+    real(kind=xp) :: x(Np),y(Np),z(Np)
+    real(kind=xp) :: cx,cy,cz,sx,sy,sz
+    real(kind=xp) :: xx,yy,zz ,d
 
     cx=cos(rotx)
     sx=sin(rotx)

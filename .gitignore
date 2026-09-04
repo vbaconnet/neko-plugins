@@ -19,3 +19,5 @@ tripping/neko
 FST/src/generate_FST
 FST/examples/box/neko
 FST/examples/channel/neko
+FST/examples/box/log.*
+FST/examples/box/results_*/*.csv
