@@ -66,6 +66,7 @@ fi
 
 backend_interface="$backend_path_gpu/opr_fst_device.F90"
 
+utils="${src_path}/utils/fst_utils.f90"
 backend="$backend_device $backend_cpu $backend_interface"
 interface="${src_path}/fst_operator.f90"
 fst_core="${src_path}/FST-core/0*"
@@ -75,6 +76,6 @@ driver="${src_path}/drivers/0*"
 extras="${src_path}/extras/0*"
 
 echo $NEKO_INSTALL_PATH/bin/makeneko $backend $interface $fst_core $driver $extras $1
-./dummy_makeneko $backend $interface $fst_core $driver $extras $1
+./dummy_makeneko $utils $backend $interface $fst_core $driver $extras $1
 
 rm dummy_makeneko

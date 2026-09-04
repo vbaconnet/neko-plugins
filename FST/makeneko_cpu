@@ -20,12 +20,14 @@ fi
 NEKO_INSTALL_PATH=${2}
 src_path=${3}
 
+utils="${src_path}/utils/fst_utils.f90"
 backend="${src_path}/bcknd/cpu/opr_fst_cpu.f90 ${src_path}/bcknd/device/opr_fst_device.F90"
 interface="${src_path}/fst_operator.f90"
 fst_core="${src_path}/FST-core/0*"
 driver="${src_path}/drivers/0*"
 
-echo ${NEKO_INSTALL_PATH}/bin/makeneko $backend $interface $fst_core $driver $1
-${NEKO_INSTALL_PATH}/bin/makeneko $backend $interface $fst_core $driver $1
+command="${NEKO_INSTALL_PATH}/bin/makeneko $utils $backend $interface $fst_core $driver $1"
+echo $command
+$command
 
 rm *.mod *.smod

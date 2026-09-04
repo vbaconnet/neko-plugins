@@ -3,11 +3,12 @@
   "case":
   {
     "mesh_file": "channel.nmsh",
-    "output_directory": "results",
+    "output_directory": "results_alloc",
     "output_at_end": true,
     "output_precision": "double",
     "output_checkpoints": false,
     "output_boundary": false,
+    "output_precision": "double",
     "checkpoint_control": "simulationtime",
     "checkpoint_value": 1.0,
     "runtime_statistics": {
@@ -28,6 +29,18 @@
 
     "FST": {
       "enabled": true,
+      "_t_start": 0.15, 
+      "Uinf": 1.0,
+      "ystart": -0.05,
+      "Tu": 3.7e-2,
+      "L": 11.53e-3,
+      "k_start": 63.77,
+      "k_end": 1660.0,
+      "n_shells": 80,
+      "files_output_path": "fst_alloc",
+      "n_pts_per_shell": 40,
+      "t_ramp": 0.001,
+      "alpha": 0.1,
       "t_start": 0.0,
       "t_ramp": 0.001,
       "alpha": 0.1,

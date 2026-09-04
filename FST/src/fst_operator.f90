@@ -48,13 +48,13 @@ contains
 
   subroutine fst_bc_compute(t, Uinf, u, v, w, mask, n_mask, &
        u_baseflow, v_baseflow, w_baseflow, &
-       wavenumbers_x, n_total_modes, phi_0, shell, shell_amplitudes, &
+       k_x, n_total_modes, phi_0, shell, shell_amplitudes, &
        random_vectors, angleXY, fringe_time, fringe_space, on_host)
     real(kind=rp), intent(inout), dimension(:,:,:,:) :: u, v, w
     real(kind=rp), intent(in) :: u_baseflow(:), v_baseflow(:), w_baseflow(:)
     integer, intent(in) :: n_mask, n_total_modes
     integer, intent(in) :: mask(0:n_mask), shell(:)
-    real(kind=rp), intent(in), dimension(:) :: wavenumbers_x, shell_amplitudes, &
+    real(kind=rp), intent(in), dimension(:) :: k_x, shell_amplitudes, &
          fringe_space
     real(kind=rp), intent(in), dimension(:,:) :: phi_0, random_vectors
     real(kind=rp), intent(in) :: t, Uinf, fringe_time, angleXY
@@ -81,7 +81,7 @@ contains
        randvec_d = device_get_ptr(random_vectors)
        shell_d = device_get_ptr(shell)
        shell_amp_d = device_get_ptr(shell_amplitudes)
-       k_x_d = device_get_ptr(wavenumbers_x)
+       k_x_d = device_get_ptr(k_x)
        mask_d = device_get_ptr(mask)
 
        call opr_fst_device_fst(t, Uinf, u_d,v_d,w_d, mask_d,n_mask, &
@@ -90,7 +90,7 @@ contains
     else
        call opr_fst_cpu_fst(t, Uinf, u,v,w, mask,n_mask, &
             u_baseflow, v_baseflow, w_baseflow, &
-            wavenumbers_x, n_total_modes, phi_0, shell, shell_amplitudes, &
+            k_x, n_total_modes, phi_0, shell, shell_amplitudes, &
             random_vectors, cosa, sina, fringe_time, fringe_space)
     end if
 

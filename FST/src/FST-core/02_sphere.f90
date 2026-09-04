@@ -2,8 +2,9 @@ module sphere
   use num_types, only : rp
   use math, only : pi
   use utils, only : neko_error
-  use logger, only : LOG_SIZE
-  use global_params
+  use fst_utils, only : print_param
+  use logger, only : LOG_SIZE, neko_log
+  !use global_params
   implicit none
 
 contains
@@ -54,8 +55,8 @@ contains
 
     if (Np.le.2) then
        call asp(x, y, z, 1, 0._rp, 0._rp, 0._rp)
-       Nl=0.
-       Np=1.
+       Nl=0
+       Np=1
     else if (Np.eq.4) then
        !let's have a tetraeder
        Np=4
@@ -133,22 +134,22 @@ contains
     else if (Np.eq.12) then
        !     let's have an ikosaeder
        Np=12
-       w=0.5*(sqrt(5.)+1._rp)
+       w=0.5_rp*(sqrt(5._rp)+1._rp)
        call asp(x,y,z,1,w/2._rp, 0._rp, 0.5_rp*(w-1))
        call asp(x,y,z,2,w/2._rp, 0._rp, 0.5_rp*(w+1))
        call asp(x,y,z,3,0._rp,0.5_rp*(w-1._rp),0.5_rp*w)
        call asp(x,y,z,4,0._rp,0.5_rp*(w+1._rp),0.5_rp*w)
        call asp(x,y,z,5,0.5_rp*w,w,0.5_rp*(w-1._rp))
        call asp(x,y,z,6,0.5_rp*w,w,0.5_rp*(w+1._rp))
-       call asp(x,y,z,7,w,(w+1._rp)/2.,w/2.)
-       call asp(x,y,z,8,w,(w-1._rp)/2.,w/2.)
-       call asp(x,y,z,9,0.5*(w+1._rp), 0.5*w,w)
-       call asp(x,y,z,10,0.5*(w-1),0.5*w,w)
-       call asp(x,y,z,11,0.5*(w+1),0.5*w,0._rp)
-       call asp(x,y,z,12,0.5*(w-1),0.5*w,0._rp)
+       call asp(x,y,z,7,w,(w+1._rp)/2._rp,w/2._rp)
+       call asp(x,y,z,8,w,(w-1._rp)/2._rp,w/2._rp)
+       call asp(x,y,z,9,0.5_rp*(w+1._rp), 0.5_rp*w,w)
+       call asp(x,y,z,10,0.5_rp*(w-1),0.5_rp*w,w)
+       call asp(x,y,z,11,0.5_rp*(w+1),0.5_rp*w,0._rp)
+       call asp(x,y,z,12,0.5_rp*(w-1),0.5_rp*w,0._rp)
 
-       call trans(x,y,z,Np,-0.5*w,-0.5*w,-0.5*w)
-       call scale1(x,y,z,Np,2./(sqrt(w**2+1._rp)))
+       call trans(x,y,z,Np,-0.5_rp*w,-0.5_rp*w,-0.5_rp*w)
+       call scale1(x,y,z,Np,2._rp/(sqrt(w**2._rp + 1._rp)))
 
 
 
@@ -187,31 +188,31 @@ contains
     else if (Np.eq.20) then
        !        let's have a dodekaeder
 
-       w=0.5*(sqrt(5.)+3.)
+       w=0.5_rp*(sqrt(5._rp)+3._rp)
        Np=20
-       call asp(x,y,z,1,0.5*w,0.5*(w-1._rp),0._rp)
-       call asp(x,y,z,2,.5*w,.5*(w+1._rp),0._rp)
-       call asp(x,y,z,3,w-0.5,w-.5,.5_rp)
-       call asp(x,y,z,4,w,.5*w,.5*(w-1._rp))
-       call asp(x,y,z,5,w-.5,0.5_rp,.5_rp)
-       call asp(x,y,z,6,.5*(w+1._rp),0._rp,.5*w)
-       call asp(x,y,z,7,.5*(w-1._rp),0._rp,.5*w)
-       call asp(x,y,z,8,0.5_rp,0.5_rp,0.5_rp)
-       call asp(x,y,z,9,0._rp,.5*w,(w-1._rp)*.5_rp)
-       call asp(x,y,z,10,.5_rp,w-.5_rp,.5_rp)
-       call asp(x,y,z,11,.5*(w-1._rp),w,.5*w)
-       call asp(x,y,z,12,.5*(w+1._rp),w,.5*w)
-       call asp(x,y,z,13,w-.5,w-.5,w-.5)
-       call asp(x,y,z,14,w,.5*w,.5*(w+1._rp))
-       call asp(x,y,z,15,w-.5,.5_rp,w-.5)
-       call asp(x,y,z,16,.5*w,.5*(w-1._rp),w)
-       call asp(x,y,z,17,.5_rp,.5_rp,w-.5_rp)
-       call asp(x,y,z,18,0._rp,.5*w,.5*(w+1._rp))
-       call asp(x,y,z,19,.5_rp,w-.5,w-.5)
-       call asp(x,y,z,20,.5_rp*w,.5*(w+1._rp),w)
+       call asp(x, y, z, 1 , 0.5_rp*w        , 0.5_rp*(w-1._rp) , 0._rp)
+       call asp(x, y, z, 2 , 0.5_rp*w        , 0.5_rp*(w+1._rp) , 0._rp)
+       call asp(x, y, z, 3 , w-0.5_rp        , w-0.5_rp         , 0.5_rp)
+       call asp(x, y, z, 4 , w               , 0.5_rp*w         ,  0.5_rp*(w-1._rp))
+       call asp(x, y, z, 5 , w-0.5_rp        , 0.5_rp           ,  0.5_rp)
+       call asp(x, y, z, 6 , 0.5_rp*(w+1._rp), 0._rp            , 0.5_rp*w)
+       call asp(x, y, z, 7 , 0.5_rp*(w-1._rp), 0._rp            , 0.5_rp*w)
+       call asp(x, y, z, 8 , 0.5_rp          , 0.5_rp           , 0.5_rp)
+       call asp(x, y, z, 9 , 0._rp           , 0.5_rp*w         , (w-1._rp)*0.5_rp)
+       call asp(x, y, z, 10, 0.5_rp          , w-0.5_rp         , 0.5_rp)
+       call asp(x, y, z, 11, 0.5_rp*(w-1._rp), w                , 0.5_rp*w)
+       call asp(x, y, z, 12, 0.5_rp*(w+1._rp), w                , 0.5_rp*w)
+       call asp(x, y, z, 13, w-0.5_rp        , w-0.5_rp         , w-0.5_rp)
+       call asp(x, y, z, 14, w               , 0.5_rp*w         , 0.5_rp*(w+1._rp))
+       call asp(x, y, z, 15, w-0.5_rp        , 0.5_rp           , w-0.5_rp)
+       call asp(x, y, z, 16, 0.5_rp*w        , 0.5_rp*(w-1._rp) , w)
+       call asp(x, y, z, 17, 0.5_rp          , 0.5_rp           , w-0.5_rp)
+       call asp(x, y, z, 18, 0._rp           , 0.5_rp*w         , 0.5_rp*(w+1._rp))
+       call asp(x, y, z, 19, 0.5_rp          , w-0.5_rp         , w-0.5_rp)
+       call asp(x, y, z, 20, 0.5_rp*w        , 0.5_rp*(w+1._rp) , w)
 
-       call trans(x,y,z,Np,-0.5*w,-0.5*w,-0.5*w)
-       call scale1(x,y,z,Np,2./(sqrt(w**2+1._rp)))
+       call trans(x, y, z, Np, -0.5_rp*w, -0.5_rp*w, -0.5_rp*w)
+       call scale1(x, y, z, Np, 2.0_rp/(sqrt(w**2.0_rp+1._rp)))
 
        Nl=30
        call asl(l,1,1,2)
@@ -248,70 +249,70 @@ contains
 
     else if (.not.(new)) then
 
-       !       having uniformly distributed sphere
+      !  !       having uniformly distributed sphere
 
-       Npp=Np
+      !  Npp=Np
 
-       Nn=(1._rp+sqrt(-3.+2.*Npp))/2.
-       Nn = Nn*2
-       Npn = real(Nn, kind=rp)**2./2.-real(Nn, kind=rp)+2.
-       if (file) then
-          if (Np.ne.Npn) then
-             call neko_log%message('number of points is not exactly the same...')
-             call print_param('Np ', real(Np, kind=rp))
-             call print_param('Npn', real(Npn, kind=rp))
-          else
-             call print_param('Np', real(Np, kind=rp))
-          end if
-       end if
+      !  Nn=(1._rp+sqrt(-3.+2.*Npp))/2.
+      !  Nn = Nn*2
+      !  Npn = real(Nn, kind=rp)**2./2.-real(Nn, kind=rp)+2.
+      !  if (file) then
+      !     if (Np.ne.Npn) then
+      !        call neko_log%message('number of points is not exactly the same...')
+      !        call print_param('Np ', real(Np, kind=rp))
+      !        call print_param('Npn', real(Npn, kind=rp))
+      !     else
+      !        call print_param('Np', real(Np, kind=rp))
+      !     end if
+      !  end if
 
-       Np=Npn
+      !  Np=Npn
 
-       dphi= 2*pi / real(Nn, kind=rp)
-       dtheta = 2*pi / real(Nn, kind=rp)
+      !  dphi= 2.0_rp*pi / real(Nn, kind=rp)
+      !  dtheta = 2.0_rp*pi / real(Nn, kind=rp)
 
-       k=1
-       x(k)=0.
-       y(k)=0.
-       z(k)=1._rp
-       do j=1, Nn/2-1
-          do i=1, (Nn)
-             k=k+1
-             x(k) = cos(i*dphi)*sin(j*dtheta)
-             y(k) = sin(i*dphi)*sin(j*dtheta)
-             z(k) = cos ( j*dtheta )
-          end do
-       end do
-       k=k+1
-       x(k)=0.
-       y(k)=0.
-       z(k)=-1._rp
+      !  k=1
+      !  x(k)=0.
+      !  y(k)=0.
+      !  z(k)=1._rp
+      !  do j=1, Nn/2-1
+      !     do i=1, (Nn)
+      !        k=k+1
+      !        x(k) = cos(i*dphi)*sin(j*dtheta)
+      !        y(k) = sin(i*dphi)*sin(j*dtheta)
+      !        z(k) = cos ( j*dtheta )
+      !     end do
+      !  end do
+      !  k=k+1
+      !  x(k)=0.
+      !  y(k)=0.
+      !  z(k)=-1._rp
 
-       k=0
-       do i=2, Nn+1
-          k=k+1
-          call asl(l,k,1,i)
-          k=k+1
-          call asl(l,k,Npn,Npn-i+1)
-       end do
+      !  k=0
+      !  do i=2, Nn+1
+      !     k=k+1
+      !     call asl(l,k,1,i)
+      !     k=k+1
+      !     call asl(l,k,Npn,Npn-i+1)
+      !  end do
 
-       do j=1,Nn/2-1
-          do i=1, Nn -1
-             k=k+1
-             call asl(l,k,(j-1)*Nn+i+1,(j-1)*Nn+i+2)
-             if (j.ne.1) then
-                k=k+1
-                call asl(l,k,(j-1)*Nn+i+1,(j-2)*Nn+i+1)
-             end if
-          end do
-          k=k+1
-          call asl(l,k,(j-1)*Nn+i+1,(j-1)*Nn+2)
-          if (j.ne.1) then
-             k=k+1
-             call asl(l,k,(j-1)*Nn+i+1,(j-2)*Nn+i+1)
-          end if
-       end do
-       Nl=k
+      !  do j=1,Nn/2-1
+      !     do i=1, Nn -1
+      !        k=k+1
+      !        call asl(l,k,(j-1)*Nn+i+1,(j-1)*Nn+i+2)
+      !        if (j.ne.1) then
+      !           k=k+1
+      !           call asl(l,k,(j-1)*Nn+i+1,(j-2)*Nn+i+1)
+      !        end if
+      !     end do
+      !     k=k+1
+      !     call asl(l,k,(j-1)*Nn+i+1,(j-1)*Nn+2)
+      !     if (j.ne.1) then
+      !        k=k+1
+      !        call asl(l,k,(j-1)*Nn+i+1,(j-2)*Nn+i+1)
+      !     end if
+      !  end do
+      !  Nl=k
 
     else if (new) then
        !     having it differently
