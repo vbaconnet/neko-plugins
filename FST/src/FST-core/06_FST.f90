@@ -693,6 +693,9 @@ contains
 
     call MPI_Bcast(found_fst_config, 1, MPI_LOGICAL, 0, NEKO_COMM, ierr)
     
+    ! Broadcast variables to all ranks if fst.config was found.
+    ! Technically not all of those are needed on all ranks but it's more
+    ! for completeness than anything else.
     if (found_fst_config) then
       call MPI_Bcast(this%Uinf, 1, MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr) 
       call MPI_Bcast(this%Tu, 1, MPI_EXTRA_PRECISION, 0, NEKO_COMM, ierr) 
